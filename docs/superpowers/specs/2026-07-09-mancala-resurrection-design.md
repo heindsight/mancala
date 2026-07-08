@@ -104,10 +104,21 @@ class Rules(Protocol):
     name: str
     def initial_state(self, seeds_per_cup: int = 4) -> GameState: ...
     def legal_moves(self, state: GameState) -> tuple[Move, ...]: ...
-    def apply_move(self, state: GameState, move: Move) -> MoveResult: ...
+    def apply_move(
+        self,
+        state: GameState,
+        move: Move,
+        history: Container[GameState] = frozenset(),
+    ) -> MoveResult: ...
     def is_over(self, state: GameState) -> bool: ...
     def winner(self, state: GameState) -> Player | None: ...  # None = draw or ongoing
 ```
+
+`history` is the set of states already seen this game; variants with
+repetition rules (Oware) consult it and resolve repetition inside
+`apply_move`, so the returned state is always fully resolved and
+`is_over`/`winner` remain pure single-state functions. Variants without
+such rules (Kalah) ignore it.
 
 Stateless rules + value states mean one `Rules` instance can serve an
 interactive match, a game-tree search, and a server session concurrently.
@@ -144,11 +155,15 @@ support (Kalah accepts 3–6 seeds per cup; Oware accepts only 4).
   that reaches them if one exists; if none exists, the game ends and the
   mover keeps all remaining seeds.
 - Game ends immediately when a store exceeds 24; 24–24 is a draw.
-- **Repetition rule**: endgames with few seeds can cycle forever. When a
-  `GameState` (which includes whose turn it is) repeats within a game, the
-  game ends and each player captures the seeds remaining on their own side.
-  Repetition detection needs history, so it lives in `Match` (see below),
-  not in the pure `Rules.is_over`.
+- **Repetition rule**: endgames with few seeds can cycle forever. When
+  `apply_move` produces a `GameState` (which includes whose turn it is) that
+  already occurred this game — detected via its `history` argument — the
+  game ends immediately: each player captures the seeds remaining on their
+  own side, with the sweep emitted as events and the returned state
+  terminal. (Kalah needs no such rule: every seed only moves toward the
+  stores, so its positions cannot repeat.) Note for the AI milestone:
+  game-tree search must thread path history into `apply_move` to see
+  repetition endings.
 
 ## Match wrapper
 
@@ -157,12 +172,10 @@ support (Kalah accepts 3–6 seeds per cup; Oware accepts only 4).
 - `play(move) -> MoveResult` — validates against `legal_moves`, raises
   `IllegalMoveError`, advances current state.
 - `history` — sequence of `(state, move, events)`; enables undo/replay later.
-- `state`, `is_over`, `winner` conveniences. These wrap the pure
-  `Rules.is_over`/`Rules.winner` and additionally apply the Oware repetition
-  rule: on seeing a repeated `GameState`, `Match` ends the game, sweeping
-  each side's seeds to its owner (emitting the corresponding events).
-  Interactive code and playout-based tests always go through `Match`, so
-  games are guaranteed to terminate.
+- `state`, `is_over`, `winner` conveniences delegating to `Rules`.
+- Threads the set of previously seen states into `apply_move` (it already
+  keeps history), so `Match` contains no variant-specific logic. All games
+  played through `Match` — including playout-based tests — terminate.
 
 ## CLI
 
