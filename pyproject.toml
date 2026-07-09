@@ -1,0 +1,35 @@
+[project]
+name = "mancala"
+version = "0.1.0"
+description = "Mancala family board games: engine and terminal interface"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = []
+
+[project.scripts]
+mancala = "mancala.cli:main"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.lint.flake8-bugbear]
+# frozenset() as a default argument (Rules.apply_move) is immutable and safe.
+extend-immutable-calls = ["frozenset"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[build-system]
+requires = ["uv_build>=0.11.23,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "hypothesis>=6.156.4",
+    "pytest>=9.1.1",
+    "ruff>=0.15.20",
+    "ty>=0.0.57",
+]
