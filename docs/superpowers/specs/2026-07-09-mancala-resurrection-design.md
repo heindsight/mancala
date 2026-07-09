@@ -154,21 +154,36 @@ support (Kalah accepts 3–6 seeds per cup; Oware accepts only 4).
 - **Must-feed**: if the opponent has no seeds, the mover must play a move
   that reaches them if one exists; if none exists, the game ends and the
   mover keeps all remaining seeds.
-- Game ends immediately when a store exceeds 24; 24–24 is a draw.
+- Game ends immediately when a store exceeds 24; 24–24 is a draw. On this
+  (and every) ending, remaining board seeds are swept to their side's owner.
+  This is a deliberate canonicalization: standard play just stops at 25+,
+  leaving board seeds uncounted. It never changes the winner, and it keeps
+  the engine invariants uniform (terminal = empty board, stores always sum
+  to 48).
 - **Repetition rule**: endgames with few seeds can cycle forever. When
   `apply_move` produces a `GameState` (which includes whose turn it is) that
   already occurred this game — detected via its `history` argument — the
   game ends immediately: each player captures the seeds remaining on their
   own side, with the sweep emitted as events and the returned state
-  terminal. (Kalah needs no such rule: every seed only moves toward the
-  stores, so its positions cannot repeat.) Note for the AI milestone:
-  game-tree search must thread path history into `apply_move` to see
-  repetition endings.
+  terminal. This deterministic first-repetition ending is a **house rule**
+  chosen for guaranteed termination — standard Abapa treats endless-cycle
+  settlement as an agreement between players. (Kalah needs no such rule:
+  every seed only moves toward the stores, so its positions cannot repeat.)
+  Note for the AI milestone: game-tree search must thread path history into
+  `apply_move` to see repetition endings, and transposition tables keyed by
+  `GameState` alone are unsound for Oware (the standard graph-history-
+  interaction caveat) — keys must include repetition context, or
+  transposition reuse must be restricted for this variant.
 
 ## Match wrapper
 
 `Match(rules, state)` is the one stateful class:
 
+- Engine functions assume **resolved** states — ones produced by
+  `initial_state` or `apply_move`. A hand-built unresolved state (e.g. a
+  Kalah position with an empty row that was never swept) has no legal moves
+  yet is not "over"; `Match.__init__` rejects such states with `ValueError`
+  rather than deadlocking.
 - `play(move) -> MoveResult` — validates against `legal_moves`, raises
   `IllegalMoveError`, advances current state.
 - `history` — sequence of `(state, move, events)`; enables undo/replay later.

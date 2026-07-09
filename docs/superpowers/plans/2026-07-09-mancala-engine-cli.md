@@ -836,7 +836,7 @@ git commit -m "Implement Kalah sowing, capture, extra turn, and game end"
 
 **Interfaces:**
 - Consumes: `Rules` protocol, `Kalah` (for tests), `IllegalMoveError`, `MoveResult`
-- Produces: `Match(rules: Rules, state: GameState | None = None)` — `state=None` means `rules.initial_state()`. Members: `rules`, property `state -> GameState`, property `history -> tuple[tuple[GameState, Move, tuple[Event, ...]], ...]` (state *before* each move), property `is_over -> bool`, property `winner -> Player | None`, method `play(move: Move) -> MoveResult` (raises `IllegalMoveError` on illegal move or finished game; threads the set of seen states into `apply_move`).
+- Produces: `Match(rules: Rules, state: GameState | None = None)` — `state=None` means `rules.initial_state()`. Members: `rules`, property `state -> GameState`, property `history -> tuple[tuple[GameState, Move, tuple[Event, ...]], ...]` (state *before* each move), property `is_over -> bool`, property `winner -> Player | None`, method `play(move: Move) -> MoveResult` (raises `IllegalMoveError` on illegal move or finished game; threads the set of seen states into `apply_move`). `__init__` raises `ValueError` for an *unresolved* state — one with no legal moves that is not over (engine functions assume states produced by `initial_state`/`apply_move`; rejecting hand-built unswept positions early prevents a deadlocked match).
 
 - [ ] **Step 1: Write the failing tests** `tests/test_match.py`:
 
@@ -897,6 +897,14 @@ def test_an_illegal_move_leaves_the_match_unchanged() -> None:
         match.play(-1)
     assert match.state == before
     assert match.history == ()
+
+
+def test_unresolved_states_are_rejected() -> None:
+    # South's row is empty but was never swept: no legal moves, yet not
+    # "over". apply_move never produces such states; reject them up front.
+    unswept = make_state(south=(0,) * 6, north=(1, 1, 1, 1, 1, 1), stores=(20, 22))
+    with pytest.raises(ValueError, match="unresolved"):
+        Match(KALAH, unswept)
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -925,6 +933,11 @@ class Match:
     def __init__(self, rules: Rules, state: GameState | None = None) -> None:
         self.rules = rules
         self._state = state if state is not None else rules.initial_state()
+        if not rules.is_over(self._state) and not rules.legal_moves(self._state):
+            raise ValueError(
+                "unresolved state: no legal moves but not over; "
+                "pass states produced by initial_state or apply_move"
+            )
         self._seen: set[GameState] = {self._state}
         self._history: list[tuple[GameState, Move, tuple[Event, ...]]] = []
 
@@ -959,7 +972,7 @@ class Match:
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `uv run pytest tests/test_match.py -v`
-Expected: 8 passed
+Expected: 9 passed
 
 - [ ] **Step 5: Lint, format, type-check, commit**
 
@@ -1331,7 +1344,7 @@ And add the two protocol methods:
         return winner_from_stores(state) if self.is_over(state) else None
 ```
 
-Note: `not self.legal_moves(candidate)` covers both starvation cases — the next player's row is empty, or their starved opponent cannot be fed. In every ending, sweeping each side's seeds to its owner implements the spec ("the mover keeps all remaining seeds" — they are all on the mover's side).
+Note: `not self.legal_moves(candidate)` covers both starvation cases — the next player's row is empty, or their starved opponent cannot be fed. Starvation is resolved one ply early, inside the *previous* player's `apply_move`: the spec's "the mover keeps all remaining seeds" refers to the **next** player (the one facing the starved opponent), and since all remaining seeds sit on that player's side, sweeping each side to its owner awards them correctly.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -1817,7 +1830,7 @@ def main(
     if len(args.names) > 2:
         parser.error("at most two player names")
 
-    padded = [*args.names, "Player 1", "Player 2"][:2]
+    padded = [*args.names, *["Player 1", "Player 2"][len(args.names) :]]
     names = {Player.SOUTH: padded[0], Player.NORTH: padded[1]}
     rules = variants.get(args.variant)
     try:
