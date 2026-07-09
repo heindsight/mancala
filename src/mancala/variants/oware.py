@@ -2,13 +2,22 @@
 
 from collections.abc import Container
 
-from mancala.events import Captured, Event, SeedSown
+from mancala.events import Captured, Event, GameOver, SeedSown
 from mancala.rules import Move, MoveResult
 from mancala.state import GameState, Player
-from mancala.variants._common import CUPS, frozen, mutable
+from mancala.variants._common import (
+    CUPS,
+    board_empty,
+    frozen,
+    mutable,
+    sweep_remaining,
+    winner_from_stores,
+)
 
 # Sowing cycle: positions 0-5 are the mover's cups, 6-11 the opponent's.
 _CYCLE = 2 * CUPS
+
+_TARGET = 24  # capturing more than half of the 48 seeds wins
 
 
 class Oware:
@@ -66,4 +75,20 @@ class Oware:
                     board[opponent.value][cup] = 0
                     events.append(Captured(by=mover, owner=opponent, cup=cup, seeds=taken))
 
-        return MoveResult(frozen(board, stores, opponent), tuple(events))
+        candidate = frozen(board, stores, opponent)
+        game_over = (
+            stores[mover.value] > _TARGET or not self.legal_moves(candidate) or candidate in history
+        )
+        if game_over:
+            events.extend(sweep_remaining(board, stores))
+            final = frozen(board, stores, opponent)
+            events.append(GameOver(winner_from_stores(final)))
+            return MoveResult(final, tuple(events))
+
+        return MoveResult(candidate, tuple(events))
+
+    def is_over(self, state: GameState) -> bool:
+        return board_empty(state)
+
+    def winner(self, state: GameState) -> Player | None:
+        return winner_from_stores(state) if self.is_over(state) else None

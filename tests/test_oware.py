@@ -1,7 +1,8 @@
 import pytest
 from helpers import make_state
 
-from mancala.events import Captured, SeedSown
+from mancala.events import Captured, GameOver, SeedSown
+from mancala.match import Match
 from mancala.state import Player
 from mancala.variants.oware import Oware
 
@@ -102,3 +103,50 @@ def test_grand_slam_capture_is_forfeited() -> None:
     assert result.state.board[Player.NORTH.value] == (2, 2, 0, 0, 0, 0)
     assert result.state.stores == (0, 0)
     assert not any(isinstance(e, Captured) for e in result.events)
+
+
+def test_capturing_more_than_half_the_seeds_ends_the_game() -> None:
+    state = make_state(south=(0, 0, 0, 0, 0, 1), north=(1, 1, 1, 1, 1, 1), stores=(23, 18))
+    result = OWARE.apply_move(state, 5)
+    # South captures north cup 0 (now 2): store reaches 25 (> 24). Game over;
+    # north's remaining 5 seeds are swept to north's store.
+    assert result.state.board == ((0,) * 6, (0,) * 6)
+    assert result.state.stores == (25, 23)
+    assert result.events[-1] == GameOver(Player.SOUTH)
+    assert OWARE.is_over(result.state)
+    assert OWARE.winner(result.state) is Player.SOUTH
+
+
+def test_unfeedable_starved_opponent_ends_the_game() -> None:
+    # North moves its last seed into south's row; south then cannot feed the
+    # now-empty north (cup 0: 4 seeds reach only cup 4; cup 1: 1 seed).
+    state = make_state(
+        south=(3, 1, 0, 0, 0, 0),
+        north=(0, 0, 0, 0, 0, 1),
+        stores=(20, 23),
+        player=Player.NORTH,
+    )
+    result = OWARE.apply_move(state, 5)
+    assert result.state.board == ((0,) * 6, (0,) * 6)
+    assert result.state.stores == (25, 23)  # south keeps its remaining 5 seeds
+    assert result.events[-1] == GameOver(Player.SOUTH)
+
+
+def test_repeated_position_ends_the_game_with_a_split() -> None:
+    # Two lone seeds chase each other around the board and return to the
+    # exact starting position (same player to move) after 12 moves.
+    start = make_state(south=(0, 0, 0, 0, 0, 1), north=(0, 0, 0, 0, 0, 1), stores=(23, 23))
+    match = Match(OWARE, start)
+    for move in [5, 5, 0, 0, 1, 1, 2, 2, 3, 3, 4]:
+        match.play(move)
+        assert not match.is_over
+    result = match.play(4)  # recreates the starting position
+    assert match.is_over
+    assert match.state.stores == (24, 24)  # each side keeps its own seed
+    assert match.winner is None
+    assert result.events[-1] == GameOver(None)
+
+
+def test_ongoing_game_is_not_over() -> None:
+    assert not OWARE.is_over(OWARE.initial_state())
+    assert OWARE.winner(OWARE.initial_state()) is None
