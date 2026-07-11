@@ -1,6 +1,13 @@
 """Terminal interface for hot-seat mancala."""
 
+import argparse
+import sys
+from typing import TextIO
+
+from mancala import variants
 from mancala.events import Captured, Event, ExtraTurn, GameOver, SeedSown, SeedStored
+from mancala.match import Match
+from mancala.rules import IllegalMoveError
 from mancala.state import GameState, Player
 
 
@@ -53,3 +60,65 @@ def describe_result(state: GameState, winner: Player | None, names: dict[Player,
     if winner is None:
         return f"It's a draw, {south}-{north}."
     return f"{names[winner]} wins {max(south, north)}-{min(south, north)}!"
+
+
+def main(
+    argv: list[str] | None = None,
+    *,
+    stdin: TextIO | None = None,
+    stdout: TextIO | None = None,
+) -> int:
+    stdin = stdin if stdin is not None else sys.stdin
+    stdout = stdout if stdout is not None else sys.stdout
+
+    parser = argparse.ArgumentParser(prog="mancala", description="Hot-seat mancala.")
+    parser.add_argument("--variant", choices=variants.available(), default="kalah")
+    parser.add_argument("--seeds", type=int, default=4, help="seeds per cup (kalah: 3-6)")
+    parser.add_argument("names", nargs="*", default=[], help="player names (up to two)")
+    args = parser.parse_args(argv)
+    if len(args.names) > 2:
+        parser.error("at most two player names")
+
+    padded = [*args.names, *["Player 1", "Player 2"][len(args.names) :]]
+    names = {Player.SOUTH: padded[0], Player.NORTH: padded[1]}
+    rules = variants.get(args.variant)
+    try:
+        match = Match(rules, rules.initial_state(args.seeds))
+    except ValueError as error:
+        parser.error(str(error))
+
+    def out(text: str = "") -> None:
+        stdout.write(text + "\n")
+
+    while not match.is_over:
+        out()
+        out(render_board(match.state, names))
+        mover = match.state.current_player
+        stdout.write(f"{names[mover]}, choose a cup (1-6): ")
+        stdout.flush()
+        line = stdin.readline()
+        if not line:
+            out()
+            out("Game abandoned.")
+            return 1
+        text = line.strip()
+        try:
+            cup = int(text)
+        except ValueError:
+            out(f"{text!r} is not a number between 1 and 6.")
+            continue
+        if not 1 <= cup <= 6:
+            out(f"{cup} is not a number between 1 and 6.")
+            continue
+        try:
+            result = match.play(cup - 1)
+        except IllegalMoveError as error:
+            out(f"{str(error).capitalize()}.")
+            continue
+        for message in describe_move(mover, cup - 1, result.events, names):
+            out(message)
+
+    out()
+    out(render_board(match.state, names))
+    out(describe_result(match.state, match.winner, names))
+    return 0
