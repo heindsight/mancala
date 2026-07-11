@@ -11,6 +11,8 @@ mancala = "mancala.cli:main"
 
 [tool.ruff]
 line-length = 88
+unsafe-fixes = true
+show-fixes = true
 
 [tool.ruff.lint]
 select = [
