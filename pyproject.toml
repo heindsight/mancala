@@ -59,3 +59,12 @@ source = ["mancala", "tests"]
 [tool.coverage.report]
 fail_under = 100
 show_missing = true
+
+[tool.tox]
+requires = ["tox>=4", "tox-uv"]
+env_list = ["py313", "py314"]
+
+[tool.tox.env_run_base]
+runner = "uv-venv-lock-runner"
+allowlist_externals = ["make"]
+commands = [["make", "test"]]
