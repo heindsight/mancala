@@ -1,5 +1,6 @@
 import io
 
+import pytest
 from helpers import make_state
 
 from mancala import variants
@@ -12,7 +13,9 @@ NAMES = {Player.SOUTH: "Heinrich", Player.NORTH: "Nora"}
 
 
 def test_render_board_puts_the_current_player_on_the_bottom() -> None:
-    state = make_state(south=(4, 4, 4, 4, 4, 4), north=(4, 4, 4, 4, 4, 12), stores=(7, 0))
+    state = make_state(
+        south=(4, 4, 4, 4, 4, 4), north=(4, 4, 4, 4, 4, 12), stores=(7, 0)
+    )
     assert render_board(state, NAMES) == (
         "Nora (store: 0)\n"
         "    (6)   (5)   (4)   (3)   (2)   (1)\n"
@@ -117,7 +120,18 @@ def test_illegal_moves_are_reported_and_reprompted() -> None:
 
 
 def test_oware_rejects_nonstandard_seed_counts() -> None:
-    import pytest
-
     with pytest.raises(SystemExit):
-        main(["--variant", "oware", "--seeds", "5"], stdin=io.StringIO(""), stdout=io.StringIO())
+        main(
+            ["--variant", "oware", "--seeds", "5"],
+            stdin=io.StringIO(""),
+            stdout=io.StringIO(),
+        )
+
+
+def test_more_than_two_names_are_rejected() -> None:
+    with pytest.raises(SystemExit):
+        main(
+            ["Ana", "Ben", "Cara"],
+            stdin=io.StringIO(""),
+            stdout=io.StringIO(),
+        )

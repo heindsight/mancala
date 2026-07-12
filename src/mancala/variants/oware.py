@@ -73,11 +73,15 @@ class Oware:
                     taken = board[opponent.value][cup]
                     stores[mover.value] += taken
                     board[opponent.value][cup] = 0
-                    events.append(Captured(by=mover, owner=opponent, cup=cup, seeds=taken))
+                    events.append(
+                        Captured(by=mover, owner=opponent, cup=cup, seeds=taken)
+                    )
 
         candidate = frozen(board, stores, opponent)
         game_over = (
-            stores[mover.value] > _TARGET or not self.legal_moves(candidate) or candidate in history
+            stores[mover.value] > _TARGET
+            or not self.legal_moves(candidate)
+            or candidate in history
         )
         if game_over:
             events.extend(sweep_remaining(board, stores))

@@ -1,3 +1,7 @@
+import dataclasses
+
+import pytest
+
 from mancala.events import Captured, ExtraTurn, GameOver, SeedSown, SeedStored
 from mancala.rules import IllegalMoveError, MoveResult
 from mancala.state import GameState, Player
@@ -17,17 +21,15 @@ def test_events_are_value_equal_within_a_type() -> None:
 
 
 def test_events_are_immutable() -> None:
-    import dataclasses
-
-    import pytest
-
     event = SeedSown(Player.SOUTH, 0)
     with pytest.raises(dataclasses.FrozenInstanceError):
         event.cup = 5  # ty: ignore[invalid-assignment]
 
 
 def test_move_result_carries_state_and_events() -> None:
-    state = GameState(board=((0,) * 6, (0,) * 6), stores=(24, 24), current_player=Player.SOUTH)
+    state = GameState(
+        board=((0,) * 6, (0,) * 6), stores=(24, 24), current_player=Player.SOUTH
+    )
     result = MoveResult(state=state, events=(GameOver(None),))
     assert result.state is state
     assert result.events == (GameOver(None),)

@@ -8,14 +8,18 @@ from mancala.state import Player
 
 def test_scripted_kalah_endgame_plays_out_to_a_north_win() -> None:
     # Hand-verified script: south empties its row on the third move.
-    start = make_state(south=(0, 0, 0, 0, 1, 2), north=(1, 0, 0, 0, 0, 1), stores=(20, 23))
+    start = make_state(
+        south=(0, 0, 0, 0, 1, 2), north=(1, 0, 0, 0, 0, 1), stores=(20, 23)
+    )
     match = Match(variants.get("kalah"), start)
 
     match.play(4)  # south: 1 seed to cup 5 (now 3 seeds)
     assert match.state.board[Player.SOUTH.value] == (0, 0, 0, 0, 0, 3)
     assert not match.is_over
 
-    match.play(0)  # north: 1 seed to own empty cup 1; opposite south cup 4 is empty -> no capture
+    match.play(
+        0
+    )  # north: 1 seed to own empty cup 1; opposite south cup 4 is empty -> no capture
     assert match.state.board[Player.NORTH.value] == (0, 1, 0, 0, 0, 1)
     assert match.state.stores == (20, 23)
 

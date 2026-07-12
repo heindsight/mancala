@@ -106,7 +106,9 @@ def test_grand_slam_capture_is_forfeited() -> None:
 
 
 def test_capturing_more_than_half_the_seeds_ends_the_game() -> None:
-    state = make_state(south=(0, 0, 0, 0, 0, 1), north=(1, 1, 1, 1, 1, 1), stores=(23, 18))
+    state = make_state(
+        south=(0, 0, 0, 0, 0, 1), north=(1, 1, 1, 1, 1, 1), stores=(23, 18)
+    )
     result = OWARE.apply_move(state, 5)
     # South captures north cup 0 (now 2): store reaches 25 (> 24). Game over;
     # north's remaining 5 seeds are swept to north's store.
@@ -135,7 +137,9 @@ def test_unfeedable_starved_opponent_ends_the_game() -> None:
 def test_repeated_position_ends_the_game_with_a_split() -> None:
     # Two lone seeds chase each other around the board and return to the
     # exact starting position (same player to move) after 12 moves.
-    start = make_state(south=(0, 0, 0, 0, 0, 1), north=(0, 0, 0, 0, 0, 1), stores=(23, 23))
+    start = make_state(
+        south=(0, 0, 0, 0, 0, 1), north=(0, 0, 0, 0, 0, 1), stores=(23, 23)
+    )
     match = Match(OWARE, start)
     for move in [5, 5, 0, 0, 1, 1, 2, 2, 3, 3, 4]:
         match.play(move)

@@ -44,10 +44,13 @@ def describe_move(
         match event:
             case Captured(by=by, owner=owner, cup=cup, seeds=seeds) if by is not owner:
                 lines.append(
-                    f"{names[by]} captures {_seeds(seeds)} from {names[owner]}'s cup {cup + 1}."
+                    f"{names[by]} captures {_seeds(seeds)} "
+                    f"from {names[owner]}'s cup {cup + 1}."
                 )
             case Captured(by=by, cup=cup, seeds=seeds):
-                lines.append(f"{names[by]} collects {_seeds(seeds)} from cup {cup + 1}.")
+                lines.append(
+                    f"{names[by]} collects {_seeds(seeds)} from cup {cup + 1}."
+                )
             case ExtraTurn(player=player):
                 lines.append(f"{names[player]} gets an extra turn!")
             case GameOver():
@@ -55,7 +58,9 @@ def describe_move(
     return lines
 
 
-def describe_result(state: GameState, winner: Player | None, names: dict[Player, str]) -> str:
+def describe_result(
+    state: GameState, winner: Player | None, names: dict[Player, str]
+) -> str:
     south, north = state.stores
     if winner is None:
         return f"It's a draw, {south}-{north}."
@@ -73,7 +78,9 @@ def main(
 
     parser = argparse.ArgumentParser(prog="mancala", description="Hot-seat mancala.")
     parser.add_argument("--variant", choices=variants.available(), default="kalah")
-    parser.add_argument("--seeds", type=int, default=4, help="seeds per cup (kalah: 3-6)")
+    parser.add_argument(
+        "--seeds", type=int, default=4, help="seeds per cup (kalah: 3-6)"
+    )
     parser.add_argument("names", nargs="*", default=[], help="player names (up to two)")
     args = parser.parse_args(argv)
     if len(args.names) > 2:

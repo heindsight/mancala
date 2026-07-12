@@ -11,7 +11,9 @@ def get(name: str) -> Rules:
     try:
         return _REGISTRY[name]
     except KeyError:
-        raise ValueError(f"unknown variant {name!r}; available: {', '.join(available())}") from None
+        raise ValueError(
+            f"unknown variant {name!r}; available: {', '.join(available())}"
+        ) from None
 
 
 def available() -> tuple[str, ...]:

@@ -39,6 +39,7 @@ class Kalah:
         move: Move,
         history: Container[GameState] = frozenset(),
     ) -> MoveResult:
+        del history  # kalah has no repetition rule
         mover = state.current_player
         opponent = mover.opponent
         board, stores = mutable(state)
@@ -59,7 +60,11 @@ class Kalah:
             seeds -= 1
 
         opposite = CUPS - 1 - pos
-        if pos < CUPS and board[mover.value][pos] == 1 and board[opponent.value][opposite]:
+        if (
+            pos < CUPS
+            and board[mover.value][pos] == 1
+            and board[opponent.value][opposite]
+        ):
             for owner, cup in ((mover, pos), (opponent, opposite)):
                 taken = board[owner.value][cup]
                 stores[mover.value] += taken
