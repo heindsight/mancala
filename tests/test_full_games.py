@@ -1,7 +1,7 @@
 from helpers import make_state
 
 from mancala import variants
-from mancala.events import GameOver
+from mancala.events import Captured, GameOver, SeedSown, SeedStored
 from mancala.match import Match
 from mancala.state import Player
 
@@ -28,7 +28,17 @@ def test_scripted_kalah_endgame_plays_out_to_a_north_win() -> None:
     assert match.state.board == ((0,) * 6, (0,) * 6)
     assert match.state.stores == (21, 27)
     assert match.winner is Player.NORTH
-    assert result.events[-1] == GameOver(Player.NORTH)
+    # The final move sows into north's row and then the end-of-game sweep
+    # returns those seeds to north — a genuine multi-step interaction.
+    assert result.events == (
+        SeedStored(Player.SOUTH),
+        SeedSown(Player.NORTH, 0),
+        SeedSown(Player.NORTH, 1),
+        Captured(by=Player.NORTH, owner=Player.NORTH, cup=0, seeds=1),
+        Captured(by=Player.NORTH, owner=Player.NORTH, cup=1, seeds=2),
+        Captured(by=Player.NORTH, owner=Player.NORTH, cup=5, seeds=1),
+        GameOver(Player.NORTH),
+    )
 
 
 def first_legal_playout(name: str) -> Match:
