@@ -3,6 +3,8 @@ name = "mancala"
 version = "0.1.0"
 description = "Mancala family board games: engine and terminal interface"
 readme = "README.md"
+license = "BSD-2-Clause"
+license-files = ["LICENSE"]
 requires-python = ">=3.13"
 dependencies = []
 
