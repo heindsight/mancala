@@ -160,6 +160,12 @@ def test_read_move_returns_none_when_input_is_exhausted() -> None:
     assert read_move("Ana", io.StringIO(""), io.StringIO()) is None
 
 
+def test_read_move_returns_none_when_interrupted(mocker: MockerFixture) -> None:
+    stdin = mocker.MagicMock(spec=io.StringIO)
+    stdin.readline.side_effect = KeyboardInterrupt
+    assert read_move("Ana", stdin, io.StringIO()) is None
+
+
 def test_read_move_keeps_prompting_until_the_input_is_valid() -> None:
     assert read_move("Ana", io.StringIO("x\n0\n7\n3\n"), io.StringIO()) == 2
 

@@ -66,10 +66,13 @@ def play_match(
 
 
 def read_move(name: str, stdin: TextIO, stdout: TextIO) -> Move | None:
-    """Prompt until `name` picks a cup between 1 and 6; None means end of input."""
+    """Prompt until `name` picks a cup between 1 and 6; None means the player quit."""
     while True:
         print(f"{name}, choose a cup (1-6): ", end="", file=stdout, flush=True)
-        line = stdin.readline()
+        try:
+            line = stdin.readline()
+        except KeyboardInterrupt:
+            return None
         if not line:
             return None
         text = line.strip()
