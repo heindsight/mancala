@@ -1,6 +1,7 @@
 """Game variant implementations and their registry."""
 
 from mancala.rules import Rules
+from mancala.variants._common import CUPS as CUPS
 from mancala.variants.kalah import Kalah
 from mancala.variants.oware import Oware
 

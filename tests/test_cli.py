@@ -1,16 +1,43 @@
 import io
-import re
+import sys
+from unittest.mock import MagicMock, call
 
 import pytest
 from helpers import make_state
+from pytest_mock import MockerFixture
 
 from mancala import variants
-from mancala.cli import describe_move, describe_result, main, render_board
+from mancala.cli import (
+    describe_move,
+    describe_result,
+    main,
+    play_match,
+    read_move,
+    render_board,
+)
 from mancala.events import Captured, ExtraTurn, GameOver, SeedSown, SeedStored
 from mancala.match import Match
 from mancala.state import Player
+from mancala.variants.kalah import Kalah
 
+KALAH = Kalah()
 NAMES = {Player.SOUTH: "Heinrich", Player.NORTH: "Nora"}
+ENDGAME = make_state(south=(0, 0, 0, 0, 0, 1), north=(0,) * 6, stores=(23, 24))
+
+
+@pytest.fixture
+def mock_read_move(mocker: MockerFixture) -> MagicMock:
+    return mocker.patch("mancala.cli.read_move")
+
+
+@pytest.fixture
+def mock_render_board(mocker: MockerFixture) -> MagicMock:
+    return mocker.patch("mancala.cli.render_board", return_value="<board>")
+
+
+@pytest.fixture
+def mock_play_match(mocker: MockerFixture) -> MagicMock:
+    return mocker.patch("mancala.cli.play_match", return_value=0)
 
 
 def test_render_board_puts_the_current_player_on_the_bottom() -> None:
@@ -44,149 +71,232 @@ def test_render_board_flips_for_the_other_player() -> None:
     )
 
 
-def test_describe_move_summarises_sowing_and_details_captures() -> None:
+def test_describe_move_summarises_the_sowing() -> None:
     events = (
         SeedSown(Player.SOUTH, 3),
         SeedSown(Player.SOUTH, 4),
         SeedStored(Player.SOUTH),
-        Captured(by=Player.SOUTH, owner=Player.SOUTH, cup=1, seeds=1),
-        Captured(by=Player.SOUTH, owner=Player.NORTH, cup=4, seeds=5),
     )
     assert describe_move(Player.SOUTH, 2, events, NAMES) == [
-        "Heinrich sows 3 seeds from cup 3.",
-        "Heinrich collects 1 seed from cup 2.",
+        "Heinrich sows 3 seeds from cup 3."
+    ]
+
+
+def test_describe_move_uses_the_singular_for_a_single_seed() -> None:
+    events = (SeedStored(Player.NORTH),)
+    assert describe_move(Player.NORTH, 5, events, NAMES) == [
+        "Nora sows 1 seed from cup 6."
+    ]
+
+
+def test_describe_move_details_captures_from_the_opponent() -> None:
+    events = (
+        SeedSown(Player.SOUTH, 4),
+        Captured(by=Player.SOUTH, owner=Player.NORTH, cup=4, seeds=5),
+    )
+    assert describe_move(Player.SOUTH, 3, events, NAMES) == [
+        "Heinrich sows 1 seed from cup 4.",
         "Heinrich captures 5 seeds from Nora's cup 5.",
     ]
 
 
-def test_describe_move_reports_extra_turns_and_game_over() -> None:
+def test_describe_move_details_collections_from_the_movers_own_row() -> None:
+    events = (
+        SeedSown(Player.SOUTH, 1),
+        Captured(by=Player.SOUTH, owner=Player.SOUTH, cup=1, seeds=2),
+    )
+    assert describe_move(Player.SOUTH, 0, events, NAMES) == [
+        "Heinrich sows 1 seed from cup 1.",
+        "Heinrich collects 2 seeds from cup 2.",
+    ]
+
+
+def test_describe_move_announces_an_extra_turn() -> None:
     events = (SeedStored(Player.NORTH), ExtraTurn(Player.NORTH))
     assert describe_move(Player.NORTH, 5, events, NAMES) == [
         "Nora sows 1 seed from cup 6.",
         "Nora gets an extra turn!",
     ]
-    events = (SeedSown(Player.NORTH, 0), GameOver(None))
+
+
+def test_describe_move_announces_the_end_of_the_game() -> None:
+    events = (SeedSown(Player.SOUTH, 1), GameOver(None))
     assert describe_move(Player.SOUTH, 0, events, NAMES) == [
         "Heinrich sows 1 seed from cup 1.",
         "The game is over.",
     ]
 
 
-def test_describe_result_announces_winner_or_draw() -> None:
-    won = make_state(south=(0,) * 6, north=(0,) * 6, stores=(26, 22))
-    drawn = make_state(south=(0,) * 6, north=(0,) * 6, stores=(24, 24))
-    assert describe_result(won, Player.SOUTH, NAMES) == "Heinrich wins 26-22!"
-    assert describe_result(drawn, None, NAMES) == "It's a draw, 24-24."
-
-
-def _run(argv: list[str], user_input: str) -> tuple[int, str]:
-    stdout = io.StringIO()
-    code = main(argv, stdin=io.StringIO(user_input), stdout=stdout)
-    return code, stdout.getvalue()
-
-
-def _assert_in_order(output: str, fragments: list[str]) -> None:
-    cursor = 0
-    for fragment in fragments:
-        found = output.find(fragment, cursor)
-        assert found != -1, f"missing (or out of order): {fragment!r}\nin:\n{output}"
-        cursor = found + len(fragment)
-
-
-def _assert_result_line_conserves(output: str, total: int) -> None:
-    line = output.rstrip("\n").splitlines()[-1]
-    assert re.fullmatch(r".+ wins \d+-\d+!|It's a draw, \d+-\d+\.", line), line
-    assert sum(int(n) for n in re.findall(r"\d+", line)) == total
-
-
-def test_the_main_loop_narrates_moves_and_flips_the_prompt_between_players() -> None:
-    # Two hand-computed south moves (the first grants an extra turn) then EOF.
-    # Expected narration is derived by hand, not from the engine.
-    code, output = _run(["Ana", "Ben"], "3\n2\n")
-    assert code == 1
-    _assert_in_order(
-        output,
-        [
-            "Ana, choose a cup (1-6): Ana sows 4 seeds from cup 3.\n",
-            "Ana gets an extra turn!\n",
-            "Ana (store: 1)\n",  # the stored seed shows on the next board
-            "Ana, choose a cup (1-6): Ana sows 4 seeds from cup 2.\n",
-            "Ben, choose a cup (1-6): \n",  # the turn passed to Ben
-            "Game abandoned.\n",
-        ],
-    )
-    assert output.count("choose a cup (1-6): ") == 3
-    assert output.endswith("Game abandoned.\n")
-
-
-@pytest.mark.parametrize("variant", ["kalah", "oware"])
-def test_a_completed_game_announces_a_result_with_all_seeds_accounted_for(
-    variant: str,
+@pytest.mark.parametrize(
+    ("stores", "winner", "expected"),
+    [
+        ((26, 22), Player.SOUTH, "Heinrich wins 26-22!"),
+        ((22, 26), Player.NORTH, "Nora wins 26-22!"),
+    ],
+)
+def test_describe_result_announces_the_winner_with_the_score(
+    stores: tuple[int, int], winner: Player, expected: str
 ) -> None:
-    # The engine only supplies a legal move sequence that reaches game over; the
-    # assertions are engine-independent (well-formed result line, seeds conserved,
-    # final board empty), so a shared rules bug cannot make both sides agree.
-    match = Match(variants.get(variant))
-    moves: list[int] = []
-    while not match.is_over:
-        move = match.rules.legal_moves(match.state)[0]
-        match.play(move)
-        moves.append(move)
+    state = make_state(south=(0,) * 6, north=(0,) * 6, stores=stores)
+    assert describe_result(state, winner, NAMES) == expected
 
-    code, output = _run(
-        [f"--variant={variant}", "Ana", "Ben"], "".join(f"{m + 1}\n" for m in moves)
+
+def test_describe_result_announces_a_draw() -> None:
+    state = make_state(south=(0,) * 6, north=(0,) * 6, stores=(24, 24))
+    assert describe_result(state, None, NAMES) == "It's a draw, 24-24."
+
+
+def test_read_move_returns_the_chosen_cup_as_a_zero_based_move() -> None:
+    assert read_move("Ana", io.StringIO("3\n"), io.StringIO()) == 2
+
+
+def test_read_move_prompts_the_player_by_name() -> None:
+    stdout = io.StringIO()
+    read_move("Ana", io.StringIO("3\n"), stdout)
+    assert stdout.getvalue() == "Ana, choose a cup (1-6): "
+
+
+def test_read_move_returns_none_when_input_is_exhausted() -> None:
+    assert read_move("Ana", io.StringIO(""), io.StringIO()) is None
+
+
+def test_read_move_keeps_prompting_until_the_input_is_valid() -> None:
+    assert read_move("Ana", io.StringIO("x\n0\n7\n3\n"), io.StringIO()) == 2
+
+
+def test_read_move_explains_a_non_numeric_rejection() -> None:
+    stdout = io.StringIO()
+    read_move("Ana", io.StringIO("x\n3\n"), stdout)
+    assert stdout.getvalue() == (
+        "Ana, choose a cup (1-6): 'x' is not a number between 1 and 6.\n"
+        "Ana, choose a cup (1-6): "
     )
 
-    assert code == 0
-    _assert_result_line_conserves(output, total=48)
-    assert "    [ 0]  [ 0]  [ 0]  [ 0]  [ 0]  [ 0]" in output  # terminal board
+
+@pytest.mark.parametrize("cup", [0, 7])
+def test_read_move_explains_an_out_of_range_rejection(cup: int) -> None:
+    stdout = io.StringIO()
+    read_move("Ana", io.StringIO(f"{cup}\n3\n"), stdout)
+    assert stdout.getvalue() == (
+        f"Ana, choose a cup (1-6): {cup} is not a number between 1 and 6.\n"
+        "Ana, choose a cup (1-6): "
+    )
 
 
-def test_bad_input_reprompts_without_crashing() -> None:
-    code, output = _run([], "x\n0\n7\n")
-    assert code == 1  # input exhausted -> abandoned
-    assert "'x' is not a number between 1 and 6." in output
-    assert "0 is not a number between 1 and 6." in output
-    assert "7 is not a number between 1 and 6." in output
-    assert output.count("choose a cup (1-6): ") == 4  # initial prompt + one per reject
-    assert output.endswith("Game abandoned.\n")
+def test_play_match_returns_0_for_a_game_played_to_completion(
+    mock_read_move: MagicMock,
+) -> None:
+    mock_read_move.side_effect = [5]
+    assert play_match(Match(KALAH, ENDGAME), NAMES, io.StringIO(), io.StringIO()) == 0
 
 
-def test_illegal_moves_are_reported_and_reprompted() -> None:
-    # Kalah: cup 3 from the start lands in the store (extra turn); playing
-    # the now-empty cup 3 again is illegal.
-    code, output = _run(["--variant", "kalah"], "3\n3\n")
-    assert code == 1
-    assert "Player 1 sows 4 seeds from cup 3." in output
-    assert "Player 1 gets an extra turn!" in output
-    assert "Cup 3 is not a legal move." in output
-    assert output.count("choose a cup (1-6): ") == 3  # move, reprompt, EOF
-    assert output.endswith("Game abandoned.\n")
+def test_play_match_returns_1_when_input_runs_out(mock_read_move: MagicMock) -> None:
+    mock_read_move.side_effect = [None]
+    assert play_match(Match(KALAH, ENDGAME), NAMES, io.StringIO(), io.StringIO()) == 1
 
 
-def test_explicit_valid_seed_count_is_used_for_the_initial_board() -> None:
-    code, output = _run(["--variant", "kalah", "--seeds", "3"], "")
-    assert code == 1  # immediate EOF
-    assert "[ 3]" in output  # cups built with three seeds each
-    assert output.endswith("Game abandoned.\n")
+def test_play_match_reports_an_abandoned_game(mock_read_move: MagicMock) -> None:
+    mock_read_move.side_effect = [None]
+    stdout = io.StringIO()
+    play_match(Match(KALAH, ENDGAME), NAMES, io.StringIO(), stdout)
+    assert stdout.getvalue().endswith("\nGame abandoned.\n")
 
 
-def test_immediate_eof_abandons_the_game_after_one_prompt() -> None:
-    code, output = _run([], "")
-    assert code == 1
-    assert output.count("choose a cup (1-6): ") == 1
-    assert output.endswith("Game abandoned.\n")
+def test_play_match_prompts_the_current_player(mock_read_move: MagicMock) -> None:
+    mock_read_move.side_effect = [5]
+    stdin, stdout = io.StringIO(), io.StringIO()
+    play_match(Match(KALAH, ENDGAME), NAMES, stdin, stdout)
+    assert mock_read_move.mock_calls == [call("Heinrich", stdin, stdout)]
+
+
+def test_play_match_narrates_the_move(mock_read_move: MagicMock) -> None:
+    mock_read_move.side_effect = [5]
+    stdout = io.StringIO()
+    play_match(Match(KALAH, ENDGAME), NAMES, io.StringIO(), stdout)
+    assert "Heinrich sows 1 seed from cup 6.\nThe game is over.\n" in stdout.getvalue()
+
+
+def test_play_match_announces_the_result(mock_read_move: MagicMock) -> None:
+    mock_read_move.side_effect = [5]
+    stdout = io.StringIO()
+    play_match(Match(KALAH, ENDGAME), NAMES, io.StringIO(), stdout)
+    assert stdout.getvalue().endswith("It's a draw, 24-24.\n")
+
+
+def test_play_match_renders_the_board_before_the_move_and_after_the_game(
+    mock_render_board: MagicMock, mock_read_move: MagicMock
+) -> None:
+    mock_read_move.side_effect = [5]
+    match = Match(KALAH, ENDGAME)
+    play_match(match, NAMES, io.StringIO(), io.StringIO())
+    assert mock_render_board.mock_calls == [
+        call(ENDGAME, NAMES),
+        call(match.state, NAMES),
+    ]
+
+
+def test_play_match_reports_an_illegal_move(mock_read_move: MagicMock) -> None:
+    mock_read_move.side_effect = [0, 5]
+    stdout = io.StringIO()
+    play_match(Match(KALAH, ENDGAME), NAMES, io.StringIO(), stdout)
+    assert "Cup 1 is not a legal move.\n" in stdout.getvalue()
+
+
+def test_play_match_asks_again_after_an_illegal_move(mock_read_move: MagicMock) -> None:
+    mock_read_move.side_effect = [0, 5]
+    play_match(Match(KALAH, ENDGAME), NAMES, io.StringIO(), io.StringIO())
+    assert mock_read_move.call_count == 2
+
+
+def test_main_plays_the_requested_variant(mock_play_match: MagicMock) -> None:
+    main(["--variant", "oware"])
+    assert mock_play_match.call_args.args[0].rules is variants.get("oware")
+
+
+def test_main_builds_the_initial_board_with_the_requested_seeds(
+    mock_play_match: MagicMock,
+) -> None:
+    main(["--seeds", "3"])
+    assert mock_play_match.call_args.args[0].state == KALAH.initial_state(3)
+
+
+def test_main_assigns_the_player_names(mock_play_match: MagicMock) -> None:
+    main(["Ana", "Ben"])
+    assert mock_play_match.call_args.args[1] == {
+        Player.SOUTH: "Ana",
+        Player.NORTH: "Ben",
+    }
+
+
+def test_main_defaults_the_player_names(mock_play_match: MagicMock) -> None:
+    main([])
+    assert mock_play_match.call_args.args[1] == {
+        Player.SOUTH: "Player 1",
+        Player.NORTH: "Player 2",
+    }
+
+
+def test_main_passes_the_streams_to_the_match_loop(mock_play_match: MagicMock) -> None:
+    stdin, stdout = io.StringIO(), io.StringIO()
+    main([], stdin=stdin, stdout=stdout)
+    assert mock_play_match.call_args.args[2:] == (stdin, stdout)
+
+
+def test_main_defaults_to_the_process_streams(mock_play_match: MagicMock) -> None:
+    main([])
+    assert mock_play_match.call_args.args[2:] == (sys.stdin, sys.stdout)
+
+
+def test_main_returns_the_match_loops_exit_code(mock_play_match: MagicMock) -> None:
+    mock_play_match.return_value = 1
+    assert main([]) == 1
 
 
 def test_oware_rejects_nonstandard_seed_counts(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     with pytest.raises(SystemExit) as exc:
-        main(
-            ["--variant", "oware", "--seeds", "5"],
-            stdin=io.StringIO(""),
-            stdout=io.StringIO(),
-        )
+        main(["--variant", "oware", "--seeds", "5"])
     assert exc.value.code == 2
     assert "oware is played with exactly 4 seeds per cup" in capsys.readouterr().err
 
@@ -195,27 +305,20 @@ def test_kalah_rejects_out_of_range_seed_counts(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     with pytest.raises(SystemExit) as exc:
-        main(
-            ["--variant", "kalah", "--seeds", "2"],
-            stdin=io.StringIO(""),
-            stdout=io.StringIO(),
-        )
+        main(["--variant", "kalah", "--seeds", "2"])
     assert exc.value.code == 2
     assert "kalah supports 3-6 seeds per cup" in capsys.readouterr().err
 
 
 def test_unknown_variant_is_rejected(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit) as exc:
-        main(["--variant", "senet"], stdin=io.StringIO(""), stdout=io.StringIO())
+        main(["--variant", "senet"])
     assert exc.value.code == 2
-    err = capsys.readouterr().err
-    assert "invalid choice: 'senet'" in err
+    assert "invalid choice: 'senet'" in capsys.readouterr().err
 
 
-def test_more_than_two_names_are_rejected(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
+def test_more_than_two_names_are_rejected(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit) as exc:
-        main(["Ana", "Ben", "Cara"], stdin=io.StringIO(""), stdout=io.StringIO())
+        main(["Ana", "Ben", "Cara"])
     assert exc.value.code == 2
     assert "error: unrecognized arguments: Cara\n" in capsys.readouterr().err

@@ -22,9 +22,10 @@ _STORE = CUPS
 
 class Kalah:
     name = "kalah"
+    SEED_COUNTS = range(3, 7)
 
     def initial_state(self, seeds_per_cup: int = 4) -> GameState:
-        if not 3 <= seeds_per_cup <= 6:
+        if seeds_per_cup not in self.SEED_COUNTS:
             raise ValueError("kalah supports 3-6 seeds per cup")
         row = (seeds_per_cup,) * CUPS
         return GameState(board=(row, row), stores=(0, 0), current_player=Player.SOUTH)
