@@ -33,6 +33,11 @@ class Match:
         return tuple(self._history)
 
     @property
+    def seen(self) -> frozenset[GameState]:
+        """Every state this game has reached, including the current one."""
+        return frozenset(self._seen)
+
+    @property
     def is_over(self) -> bool:
         return self.rules.is_over(self._state)
 

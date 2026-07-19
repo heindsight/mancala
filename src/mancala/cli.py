@@ -76,7 +76,7 @@ def play_match(
         mover = match.state.current_player
         strategy = computers.get(mover)
         if strategy is not None:
-            move = strategy.choose(match.rules, match.state)
+            move = strategy.choose(match.rules, match.state, match.seen)
             print(f"{names[mover]} chooses cup {move + 1}.", file=stdout)
         else:
             move = read_move(names[mover], stdin, stdout)

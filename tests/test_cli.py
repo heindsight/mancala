@@ -1,5 +1,6 @@
 import io
 import sys
+from collections.abc import Set
 from unittest.mock import MagicMock, call
 
 import pytest
@@ -32,9 +33,16 @@ class ScriptedStrategy:
 
     def __init__(self, *moves: Move) -> None:
         self._moves = iter(moves)
+        self.histories: list[Set[GameState]] = []
 
-    def choose(self, rules: Rules, state: GameState) -> Move:
+    def choose(
+        self,
+        rules: Rules,
+        state: GameState,
+        history: Set[GameState] = frozenset(),
+    ) -> Move:
         del rules, state
+        self.histories.append(history)
         return next(self._moves)
 
 
@@ -338,6 +346,21 @@ def test_play_match_announces_the_computers_choice(
         computers={Player.SOUTH: ScriptedStrategy(5)},
     )
     assert "Heinrich chooses cup 6.\n" in stdout.getvalue()
+    mock_read_move.assert_not_called()
+
+
+def test_play_match_passes_the_seen_states_to_the_strategy(
+    mock_read_move: MagicMock,
+) -> None:
+    strategy = ScriptedStrategy(5)
+    play_match(
+        Match(KALAH, ENDGAME),
+        NAMES,
+        io.StringIO(),
+        io.StringIO(),
+        computers={Player.SOUTH: strategy},
+    )
+    assert strategy.histories == [frozenset({ENDGAME})]
     mock_read_move.assert_not_called()
 
 
