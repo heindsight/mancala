@@ -212,7 +212,31 @@ def test_play_match_prompts_the_current_player(mock_read_move: MagicMock) -> Non
     mock_read_move.side_effect = [5]
     stdin, stdout = io.StringIO(), io.StringIO()
     play_match(Match(KALAH, ENDGAME), NAMES, stdin, stdout)
-    assert mock_read_move.mock_calls == [call("Heinrich", stdin, stdout)]
+    assert mock_read_move.call_args_list == [call("Heinrich", stdin, stdout)]
+
+
+def test_play_match_prompts_the_players_in_turn_order(
+    mock_read_move: MagicMock,
+) -> None:
+    mock_read_move.side_effect = [0, 0, None]
+    start = make_state(south=(1, 1, 0, 0, 0, 0), north=(1, 0, 0, 0, 0, 0))
+    stdin, stdout = io.StringIO(), io.StringIO()
+    play_match(Match(KALAH, start), NAMES, stdin, stdout)
+    assert mock_read_move.call_args_list == [
+        call("Heinrich", stdin, stdout),
+        call("Nora", stdin, stdout),
+        call("Heinrich", stdin, stdout),
+    ]
+
+
+def test_play_match_prompts_the_same_player_after_an_extra_turn(
+    mock_read_move: MagicMock,
+) -> None:
+    mock_read_move.side_effect = [5, None]
+    start = make_state(south=(1, 0, 0, 0, 0, 1), north=(1, 0, 0, 0, 0, 0))
+    stdin, stdout = io.StringIO(), io.StringIO()
+    play_match(Match(KALAH, start), NAMES, stdin, stdout)
+    assert mock_read_move.call_args_list == [call("Heinrich", stdin, stdout)] * 2
 
 
 def test_play_match_narrates_the_move(mock_read_move: MagicMock) -> None:
@@ -235,9 +259,29 @@ def test_play_match_renders_the_board_before_the_move_and_after_the_game(
     mock_read_move.side_effect = [5]
     match = Match(KALAH, ENDGAME)
     play_match(match, NAMES, io.StringIO(), io.StringIO())
-    assert mock_render_board.mock_calls == [
+    assert mock_render_board.call_args_list == [
         call(ENDGAME, NAMES),
         call(match.state, NAMES),
+    ]
+
+
+def test_play_match_renders_the_current_position_each_round(
+    mock_render_board: MagicMock, mock_read_move: MagicMock
+) -> None:
+    mock_read_move.side_effect = [0, 0, None]
+    start = make_state(south=(1, 1, 0, 0, 0, 0), north=(1, 0, 0, 0, 0, 0))
+    play_match(Match(KALAH, start), NAMES, io.StringIO(), io.StringIO())
+    assert mock_render_board.call_args_list == [
+        call(start, NAMES),
+        call(
+            make_state(
+                south=(0, 2, 0, 0, 0, 0),
+                north=(1, 0, 0, 0, 0, 0),
+                player=Player.NORTH,
+            ),
+            NAMES,
+        ),
+        call(make_state(south=(0, 2, 0, 0, 0, 0), north=(0, 1, 0, 0, 0, 0)), NAMES),
     ]
 
 
@@ -250,8 +294,9 @@ def test_play_match_reports_an_illegal_move(mock_read_move: MagicMock) -> None:
 
 def test_play_match_asks_again_after_an_illegal_move(mock_read_move: MagicMock) -> None:
     mock_read_move.side_effect = [0, 5]
-    play_match(Match(KALAH, ENDGAME), NAMES, io.StringIO(), io.StringIO())
-    assert mock_read_move.call_count == 2
+    stdin, stdout = io.StringIO(), io.StringIO()
+    play_match(Match(KALAH, ENDGAME), NAMES, stdin, stdout)
+    assert mock_read_move.call_args_list == [call("Heinrich", stdin, stdout)] * 2
 
 
 def test_main_plays_the_requested_variant(mock_play_match: MagicMock) -> None:

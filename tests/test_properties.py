@@ -25,6 +25,8 @@ class PlayedMove(NamedTuple):
     state: GameState
     move: Move
     result: MoveResult
+    seen: frozenset[GameState]
+    """The states seen up to and including `state` — what Match passes as history."""
 
 
 @st.composite
@@ -41,14 +43,33 @@ def playouts(draw: st.DrawFn, names: tuple[str, ...] = _VARIANTS) -> Playout:
 def _moves_of(match: Match) -> list[PlayedMove]:
     states = [state for state, _, _ in match.history] + [match.state]
     return [
-        PlayedMove(match.rules, state, move, MoveResult(after, events))
-        for (state, move, events), after in zip(match.history, states[1:], strict=True)
+        PlayedMove(
+            match.rules,
+            state,
+            move,
+            MoveResult(after, events),
+            frozenset(states[: index + 1]),
+        )
+        for index, ((state, move, events), after) in enumerate(
+            zip(match.history, states[1:], strict=True)
+        )
     ]
 
 
 @st.composite
 def played_moves(draw: st.DrawFn, names: tuple[str, ...] = _VARIANTS) -> PlayedMove:
-    return draw(st.sampled_from(_moves_of(draw(playouts(names)).match)))
+    """A position reached in a random game, paired with any legal move from it.
+
+    Sampling the move independently of the playout covers the legal moves the
+    game did not take; those results are built with the same history a Match
+    diverging at that point would supply.
+    """
+    played = draw(st.sampled_from(_moves_of(draw(playouts(names)).match)))
+    move = draw(st.sampled_from(played.rules.legal_moves(played.state)))
+    if move == played.move:
+        return played
+    result = played.rules.apply_move(played.state, move, played.seen)
+    return played._replace(move=move, result=result)
 
 
 @st.composite
@@ -127,6 +148,14 @@ def test_apply_move_is_deterministic(played: PlayedMove) -> None:
     first = played.rules.apply_move(played.state, played.move)
     second = played.rules.apply_move(played.state, played.move)
     assert first == second
+
+
+@given(played=played_moves())
+def test_replaying_a_move_with_its_history_reproduces_the_result(
+    played: PlayedMove,
+) -> None:
+    replayed = played.rules.apply_move(played.state, played.move, played.seen)
+    assert replayed == played.result
 
 
 @given(playout=playouts())
