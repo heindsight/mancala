@@ -1,13 +1,15 @@
 import io
 import sys
+from pathlib import Path
 from unittest.mock import MagicMock, call
 
 import pytest
 from helpers import make_state
 from pytest_mock import MockerFixture
 
-from mancala import variants
+from mancala import save, variants
 from mancala.cli import (
+    SaveGame,
     describe_move,
     describe_result,
     main,
@@ -23,6 +25,7 @@ from mancala.variants.kalah import Kalah
 KALAH = Kalah()
 NAMES = {Player.SOUTH: "Heinrich", Player.NORTH: "Nora"}
 ENDGAME = make_state(south=(0, 0, 0, 0, 0, 1), north=(0,) * 6, stores=(23, 24))
+PROMPT = "Ana, choose a cup (1-6) or 'save FILE': "
 
 
 @pytest.fixture
@@ -153,7 +156,7 @@ def test_read_move_returns_the_chosen_cup_as_a_zero_based_move() -> None:
 def test_read_move_prompts_the_player_by_name() -> None:
     stdout = io.StringIO()
     read_move("Ana", io.StringIO("3\n"), stdout)
-    assert stdout.getvalue() == "Ana, choose a cup (1-6): "
+    assert stdout.getvalue() == PROMPT
 
 
 def test_read_move_returns_none_when_input_is_exhausted() -> None:
@@ -174,8 +177,7 @@ def test_read_move_explains_a_non_numeric_rejection() -> None:
     stdout = io.StringIO()
     read_move("Ana", io.StringIO("x\n3\n"), stdout)
     assert stdout.getvalue() == (
-        "Ana, choose a cup (1-6): 'x' is not a number between 1 and 6.\n"
-        "Ana, choose a cup (1-6): "
+        f"{PROMPT}'x' is not a number between 1 and 6.\n{PROMPT}"
     )
 
 
@@ -184,8 +186,7 @@ def test_read_move_explains_an_out_of_range_rejection(cup: int) -> None:
     stdout = io.StringIO()
     read_move("Ana", io.StringIO(f"{cup}\n3\n"), stdout)
     assert stdout.getvalue() == (
-        f"Ana, choose a cup (1-6): {cup} is not a number between 1 and 6.\n"
-        "Ana, choose a cup (1-6): "
+        f"{PROMPT}{cup} is not a number between 1 and 6.\n{PROMPT}"
     )
 
 
@@ -285,6 +286,42 @@ def test_play_match_renders_the_current_position_each_round(
     ]
 
 
+def test_read_move_returns_a_save_request() -> None:
+    stdin = io.StringIO("save saved-game.json\n")
+    assert read_move("Ana", stdin, io.StringIO()) == SaveGame("saved-game.json")
+
+
+def test_read_move_asks_again_when_save_names_no_file() -> None:
+    stdout = io.StringIO()
+    assert read_move("Ana", io.StringIO("save\n3\n"), stdout) == 2
+    assert "Say where to save the game: 'save FILE'.\n" in stdout.getvalue()
+
+
+def test_play_match_saves_the_game_and_exits(
+    mock_read_move: MagicMock, tmp_path: Path
+) -> None:
+    file = tmp_path / "game.json"
+    mock_read_move.side_effect = [0, SaveGame(str(file))]
+    match = Match(KALAH)
+    stdout = io.StringIO()
+    assert play_match(match, NAMES, io.StringIO(), stdout) == 0
+    assert stdout.getvalue().endswith(f"Game saved to {file}.\n")
+    restored, names = save.load(file)
+    assert restored.state == match.state
+    assert restored.history == match.history
+    assert names == NAMES
+
+
+def test_play_match_keeps_playing_when_saving_fails(
+    mock_read_move: MagicMock, tmp_path: Path
+) -> None:
+    file = tmp_path / "missing-directory" / "game.json"
+    mock_read_move.side_effect = [SaveGame(str(file)), None]
+    stdout = io.StringIO()
+    assert play_match(Match(KALAH), NAMES, io.StringIO(), stdout) == 1
+    assert "Could not save: " in stdout.getvalue()
+
+
 def test_play_match_reports_an_illegal_move(mock_read_move: MagicMock) -> None:
     mock_read_move.side_effect = [0, 5]
     stdout = io.StringIO()
@@ -341,6 +378,52 @@ def test_main_defaults_to_the_process_streams(mock_play_match: MagicMock) -> Non
 def test_main_returns_the_match_loops_exit_code(mock_play_match: MagicMock) -> None:
     mock_play_match.return_value = 1
     assert main([]) == 1
+
+
+def test_main_resumes_a_saved_game(mock_play_match: MagicMock, tmp_path: Path) -> None:
+    original = Match(variants.get("oware"))
+    original.play(2)
+    original.play(4)
+    file = tmp_path / "game.json"
+    save.dump(original, NAMES, file)
+    main(["--load", str(file)])
+    restored, names = mock_play_match.call_args.args[:2]
+    assert restored.rules is original.rules
+    assert restored.state == original.state
+    assert restored.history == original.history
+    assert names == NAMES
+
+
+def test_main_rejects_a_missing_save_file(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    with pytest.raises(SystemExit) as exc:
+        main(["--load", str(tmp_path / "game.json")])
+    assert exc.value.code == 2
+    assert "game.json" in capsys.readouterr().err
+
+
+def test_main_rejects_an_invalid_save_file(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    file = tmp_path / "game.json"
+    file.write_text("{}", encoding="utf-8")
+    with pytest.raises(SystemExit) as exc:
+        main(["--load", str(file)])
+    assert exc.value.code == 2
+    assert "not a mancala save document" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "extra", [["--variant", "kalah"], ["--seeds", "4"], ["Ana"], ["Ana", "Ben"]]
+)
+def test_main_rejects_load_combined_with_new_game_options(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path, extra: list[str]
+) -> None:
+    with pytest.raises(SystemExit) as exc:
+        main(["--load", str(tmp_path / "game.json"), *extra])
+    assert exc.value.code == 2
+    assert "--load cannot be combined" in capsys.readouterr().err
 
 
 def test_oware_rejects_nonstandard_seed_counts(

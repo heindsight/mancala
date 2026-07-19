@@ -2,13 +2,21 @@
 
 import argparse
 import sys
+from dataclasses import dataclass
 from typing import TextIO
 
-from mancala import variants
+from mancala import save, variants
 from mancala.events import Captured, Event, ExtraTurn, GameOver, SeedSown, SeedStored
 from mancala.match import Match
 from mancala.rules import IllegalMoveError, Move
 from mancala.state import GameState, Player
+
+
+@dataclass(frozen=True, slots=True)
+class SaveGame:
+    """The player asked to save the game to `file` instead of moving."""
+
+    file: str
 
 
 def main(
@@ -18,20 +26,35 @@ def main(
     stdout: TextIO | None = None,
 ) -> int:
     parser = argparse.ArgumentParser(prog="mancala", description="Hot-seat mancala.")
-    parser.add_argument("--variant", choices=variants.available(), default="kalah")
+    parser.add_argument("--variant", choices=variants.available())
     parser.add_argument(
-        "--seeds", type=int, default=4, help="seeds per cup (kalah: 3-6)"
+        "--seeds", type=int, help="seeds per cup (kalah: 3-6, default 4)"
     )
-    parser.add_argument("player1", nargs="?", default="Player 1", help="Player 1 name")
-    parser.add_argument("player2", nargs="?", default="Player 2", help="Player 2 name")
+    parser.add_argument("--load", metavar="FILE", help="resume a saved game")
+    parser.add_argument("player1", nargs="?", help="Player 1 name")
+    parser.add_argument("player2", nargs="?", help="Player 2 name")
     args = parser.parse_args(argv)
 
-    rules = variants.get(args.variant)
-    try:
-        match = Match(rules, rules.initial_state(args.seeds))
-    except ValueError as error:
-        parser.error(str(error))
-    names = {Player.SOUTH: args.player1, Player.NORTH: args.player2}
+    if args.load is not None:
+        if (args.variant, args.seeds, args.player1, args.player2) != (None,) * 4:
+            parser.error(
+                "--load cannot be combined with --variant, --seeds, or player names"
+            )
+        try:
+            match, names = save.load(args.load)
+        except (OSError, save.SaveError) as error:
+            parser.error(str(error))
+    else:
+        rules = variants.get(args.variant if args.variant is not None else "kalah")
+        seeds = args.seeds if args.seeds is not None else 4
+        try:
+            match = Match(rules, rules.initial_state(seeds))
+        except ValueError as error:
+            parser.error(str(error))
+        names = {
+            Player.SOUTH: args.player1 if args.player1 is not None else "Player 1",
+            Player.NORTH: args.player2 if args.player2 is not None else "Player 2",
+        }
     return play_match(
         match,
         names,
@@ -53,6 +76,14 @@ def play_match(
             print(file=stdout)
             print("Game abandoned.", file=stdout)
             return 1
+        if isinstance(move, SaveGame):
+            try:
+                save.dump(match, names, move.file)
+            except (OSError, save.SaveError) as error:
+                print(f"Could not save: {error}.", file=stdout)
+                continue
+            print(f"Game saved to {move.file}.", file=stdout)
+            return 0
         try:
             result = match.play(move)
         except IllegalMoveError as error:
@@ -65,10 +96,18 @@ def play_match(
     return 0
 
 
-def read_move(name: str, stdin: TextIO, stdout: TextIO) -> Move | None:
-    """Prompt until `name` picks a cup between 1 and 6; None means the player quit."""
+def read_move(name: str, stdin: TextIO, stdout: TextIO) -> Move | SaveGame | None:
+    """Prompt until `name` picks a cup between 1 and 6 or asks to save the game.
+
+    None means the player quit.
+    """
     while True:
-        print(f"{name}, choose a cup (1-6): ", end="", file=stdout, flush=True)
+        print(
+            f"{name}, choose a cup (1-6) or 'save FILE': ",
+            end="",
+            file=stdout,
+            flush=True,
+        )
         try:
             line = stdin.readline()
         except KeyboardInterrupt:
@@ -76,6 +115,12 @@ def read_move(name: str, stdin: TextIO, stdout: TextIO) -> Move | None:
         if not line:
             return None
         text = line.strip()
+        command, _, argument = text.partition(" ")
+        if command == "save":
+            if file := argument.strip():
+                return SaveGame(file)
+            print("Say where to save the game: 'save FILE'.", file=stdout)
+            continue
         try:
             cup = int(text)
         except ValueError:

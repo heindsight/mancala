@@ -8,6 +8,17 @@ for hot-seat play.
 
     uv run mancala --variant kalah Heinrich Nora
 
+## Save & resume
+
+Type `save FILE` instead of a cup number to save the game and exit. Resume
+it later with:
+
+    uv run mancala --load FILE
+
+A save file records the variant, player names, current position, and the
+full move history; on load the history is replayed and validated before
+play resumes.
+
 ## Develop
 
     uv run pytest
