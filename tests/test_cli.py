@@ -337,19 +337,19 @@ def test_play_match_asks_again_after_an_illegal_move(mock_read_move: MagicMock) 
 
 
 def test_main_plays_the_requested_variant(mock_play_match: MagicMock) -> None:
-    main(["--variant", "oware"])
+    main(["new", "--variant", "oware"])
     assert mock_play_match.call_args.args[0].rules is variants.get("oware")
 
 
 def test_main_builds_the_initial_board_with_the_requested_seeds(
     mock_play_match: MagicMock,
 ) -> None:
-    main(["--seeds", "3"])
+    main(["new", "--seeds", "3"])
     assert mock_play_match.call_args.args[0].state == KALAH.initial_state(3)
 
 
 def test_main_assigns_the_player_names(mock_play_match: MagicMock) -> None:
-    main(["Ana", "Ben"])
+    main(["new", "Ana", "Ben"])
     assert mock_play_match.call_args.args[1] == {
         Player.SOUTH: "Ana",
         Player.NORTH: "Ben",
@@ -357,7 +357,7 @@ def test_main_assigns_the_player_names(mock_play_match: MagicMock) -> None:
 
 
 def test_main_defaults_the_player_names(mock_play_match: MagicMock) -> None:
-    main([])
+    main(["new"])
     assert mock_play_match.call_args.args[1] == {
         Player.SOUTH: "Player 1",
         Player.NORTH: "Player 2",
@@ -366,18 +366,25 @@ def test_main_defaults_the_player_names(mock_play_match: MagicMock) -> None:
 
 def test_main_passes_the_streams_to_the_match_loop(mock_play_match: MagicMock) -> None:
     stdin, stdout = io.StringIO(), io.StringIO()
-    main([], stdin=stdin, stdout=stdout)
+    main(["new"], stdin=stdin, stdout=stdout)
     assert mock_play_match.call_args.args[2:] == (stdin, stdout)
 
 
 def test_main_defaults_to_the_process_streams(mock_play_match: MagicMock) -> None:
-    main([])
+    main(["new"])
     assert mock_play_match.call_args.args[2:] == (sys.stdin, sys.stdout)
 
 
 def test_main_returns_the_match_loops_exit_code(mock_play_match: MagicMock) -> None:
     mock_play_match.return_value = 1
-    assert main([]) == 1
+    assert main(["new"]) == 1
+
+
+def test_main_requires_a_subcommand(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit) as exc:
+        main([])
+    assert exc.value.code == 2
+    assert "arguments are required: command" in capsys.readouterr().err
 
 
 def test_main_resumes_a_saved_game(mock_play_match: MagicMock, tmp_path: Path) -> None:
@@ -386,7 +393,7 @@ def test_main_resumes_a_saved_game(mock_play_match: MagicMock, tmp_path: Path) -
     original.play(4)
     file = tmp_path / "game.json"
     save.dump(original, NAMES, file)
-    main(["--load", str(file)])
+    main(["resume", str(file)])
     restored, names = mock_play_match.call_args.args[:2]
     assert restored.rules is original.rules
     assert restored.state == original.state
@@ -398,7 +405,7 @@ def test_main_rejects_a_missing_save_file(
     capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     with pytest.raises(SystemExit) as exc:
-        main(["--load", str(tmp_path / "game.json")])
+        main(["resume", str(tmp_path / "game.json")])
     assert exc.value.code == 2
     assert "game.json" in capsys.readouterr().err
 
@@ -409,28 +416,23 @@ def test_main_rejects_an_invalid_save_file(
     file = tmp_path / "game.json"
     file.write_text("{}", encoding="utf-8")
     with pytest.raises(SystemExit) as exc:
-        main(["--load", str(file)])
+        main(["resume", str(file)])
     assert exc.value.code == 2
     assert "not a mancala save document" in capsys.readouterr().err
 
 
-@pytest.mark.parametrize(
-    "extra", [["--variant", "kalah"], ["--seeds", "4"], ["Ana"], ["Ana", "Ben"]]
-)
-def test_main_rejects_load_combined_with_new_game_options(
-    capsys: pytest.CaptureFixture[str], tmp_path: Path, extra: list[str]
-) -> None:
+def test_resume_requires_a_file(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit) as exc:
-        main(["--load", str(tmp_path / "game.json"), *extra])
+        main(["resume"])
     assert exc.value.code == 2
-    assert "--load cannot be combined" in capsys.readouterr().err
+    assert "arguments are required: file" in capsys.readouterr().err
 
 
 def test_oware_rejects_nonstandard_seed_counts(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     with pytest.raises(SystemExit) as exc:
-        main(["--variant", "oware", "--seeds", "5"])
+        main(["new", "--variant", "oware", "--seeds", "5"])
     assert exc.value.code == 2
     assert "oware is played with exactly 4 seeds per cup" in capsys.readouterr().err
 
@@ -439,20 +441,20 @@ def test_kalah_rejects_out_of_range_seed_counts(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     with pytest.raises(SystemExit) as exc:
-        main(["--variant", "kalah", "--seeds", "2"])
+        main(["new", "--variant", "kalah", "--seeds", "2"])
     assert exc.value.code == 2
     assert "kalah supports 3-6 seeds per cup" in capsys.readouterr().err
 
 
 def test_unknown_variant_is_rejected(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit) as exc:
-        main(["--variant", "senet"])
+        main(["new", "--variant", "senet"])
     assert exc.value.code == 2
     assert "invalid choice: 'senet'" in capsys.readouterr().err
 
 
 def test_more_than_two_names_are_rejected(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit) as exc:
-        main(["Ana", "Ben", "Cara"])
+        main(["new", "Ana", "Ben", "Cara"])
     assert exc.value.code == 2
     assert "error: unrecognized arguments: Cara\n" in capsys.readouterr().err

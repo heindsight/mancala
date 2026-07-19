@@ -26,35 +26,28 @@ def main(
     stdout: TextIO | None = None,
 ) -> int:
     parser = argparse.ArgumentParser(prog="mancala", description="Hot-seat mancala.")
-    parser.add_argument("--variant", choices=variants.available())
-    parser.add_argument(
-        "--seeds", type=int, help="seeds per cup (kalah: 3-6, default 4)"
-    )
-    parser.add_argument("--load", metavar="FILE", help="resume a saved game")
-    parser.add_argument("player1", nargs="?", help="Player 1 name")
-    parser.add_argument("player2", nargs="?", help="Player 2 name")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    new = subparsers.add_parser("new", help="start a new game")
+    new.add_argument("--variant", choices=variants.available(), default="kalah")
+    new.add_argument("--seeds", type=int, default=4, help="seeds per cup (kalah: 3-6)")
+    new.add_argument("player1", nargs="?", default="Player 1", help="Player 1 name")
+    new.add_argument("player2", nargs="?", default="Player 2", help="Player 2 name")
+    resume = subparsers.add_parser("resume", help="resume a saved game")
+    resume.add_argument("file", help="save file written with 'save FILE'")
     args = parser.parse_args(argv)
 
-    if args.load is not None:
-        if (args.variant, args.seeds, args.player1, args.player2) != (None,) * 4:
-            parser.error(
-                "--load cannot be combined with --variant, --seeds, or player names"
-            )
+    if args.command == "resume":
         try:
-            match, names = save.load(args.load)
+            match, names = save.load(args.file)
         except (OSError, save.SaveError) as error:
-            parser.error(str(error))
+            resume.error(str(error))
     else:
-        rules = variants.get(args.variant if args.variant is not None else "kalah")
-        seeds = args.seeds if args.seeds is not None else 4
+        rules = variants.get(args.variant)
         try:
-            match = Match(rules, rules.initial_state(seeds))
+            match = Match(rules, rules.initial_state(args.seeds))
         except ValueError as error:
-            parser.error(str(error))
-        names = {
-            Player.SOUTH: args.player1 if args.player1 is not None else "Player 1",
-            Player.NORTH: args.player2 if args.player2 is not None else "Player 2",
-        }
+            new.error(str(error))
+        names = {Player.SOUTH: args.player1, Player.NORTH: args.player2}
     return play_match(
         match,
         names,
