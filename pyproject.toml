@@ -23,7 +23,7 @@ select = [
     "E",       # pycodestyle Error
     "F",       # Pyflakes
     "I",       # isort
-    "PLC0415", # import-outside-top-level (Pylint)
+    "PL",      # Pylint
     "PT",      # flake8-pytest-style
     "T10",     # flake8-debugger
     "RUF",     # ruff-specific rules
@@ -35,6 +35,9 @@ select = [
 [tool.ruff.lint.flake8-bugbear]
 # frozenset() as a default argument (Rules.apply_move) is immutable and safe.
 extend-immutable-calls = ["frozenset"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**.py" = ["PLR2004"]  # Allow magic-value comparison in test assertions
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
