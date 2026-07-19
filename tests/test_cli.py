@@ -218,4 +218,4 @@ def test_more_than_two_names_are_rejected(
     with pytest.raises(SystemExit) as exc:
         main(["Ana", "Ben", "Cara"], stdin=io.StringIO(""), stdout=io.StringIO())
     assert exc.value.code == 2
-    assert "at most two player names" in capsys.readouterr().err
+    assert "error: unrecognized arguments: Cara\n" in capsys.readouterr().err

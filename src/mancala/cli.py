@@ -81,13 +81,11 @@ def main(
     parser.add_argument(
         "--seeds", type=int, default=4, help="seeds per cup (kalah: 3-6)"
     )
-    parser.add_argument("names", nargs="*", default=[], help="player names (up to two)")
+    parser.add_argument("player1", nargs="?", default="Player 1", help="Player 1 name")
+    parser.add_argument("player2", nargs="?", default="Player 2", help="Player 2 name")
     args = parser.parse_args(argv)
-    if len(args.names) > 2:
-        parser.error("at most two player names")
 
-    padded = [*args.names, *["Player 1", "Player 2"][len(args.names) :]]
-    names = {Player.SOUTH: padded[0], Player.NORTH: padded[1]}
+    names = {Player.SOUTH: args.player1, Player.NORTH: args.player2}
     rules = variants.get(args.variant)
     try:
         match = Match(rules, rules.initial_state(args.seeds))
