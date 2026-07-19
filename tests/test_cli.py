@@ -17,12 +17,25 @@ from mancala.cli import (
 )
 from mancala.events import Captured, ExtraTurn, GameOver, SeedSown, SeedStored
 from mancala.match import Match
-from mancala.state import Player
+from mancala.players import MinimaxPlayer, RandomPlayer
+from mancala.rules import Move, Rules
+from mancala.state import GameState, Player
 from mancala.variants.kalah import Kalah
 
 KALAH = Kalah()
 NAMES = {Player.SOUTH: "Heinrich", Player.NORTH: "Nora"}
 ENDGAME = make_state(south=(0, 0, 0, 0, 0, 1), north=(0,) * 6, stores=(23, 24))
+
+
+class ScriptedStrategy:
+    """A computer player that plays a fixed sequence of moves."""
+
+    def __init__(self, *moves: Move) -> None:
+        self._moves = iter(moves)
+
+    def choose(self, rules: Rules, state: GameState) -> Move:
+        del rules, state
+        return next(self._moves)
 
 
 @pytest.fixture
@@ -299,6 +312,49 @@ def test_play_match_asks_again_after_an_illegal_move(mock_read_move: MagicMock) 
     assert mock_read_move.call_args_list == [call("Heinrich", stdin, stdout)] * 2
 
 
+def test_play_match_lets_a_computer_move_without_prompting(
+    mock_read_move: MagicMock,
+) -> None:
+    exit_code = play_match(
+        Match(KALAH, ENDGAME),
+        NAMES,
+        io.StringIO(),
+        io.StringIO(),
+        computers={Player.SOUTH: ScriptedStrategy(5)},
+    )
+    assert exit_code == 0
+    mock_read_move.assert_not_called()
+
+
+def test_play_match_announces_the_computers_choice(
+    mock_read_move: MagicMock,
+) -> None:
+    stdout = io.StringIO()
+    play_match(
+        Match(KALAH, ENDGAME),
+        NAMES,
+        io.StringIO(),
+        stdout,
+        computers={Player.SOUTH: ScriptedStrategy(5)},
+    )
+    assert "Heinrich chooses cup 6.\n" in stdout.getvalue()
+    mock_read_move.assert_not_called()
+
+
+def test_play_match_still_prompts_the_human_side(mock_read_move: MagicMock) -> None:
+    mock_read_move.side_effect = [0, None]
+    start = make_state(south=(1, 1, 0, 0, 0, 0), north=(1, 0, 0, 0, 0, 0))
+    stdin, stdout = io.StringIO(), io.StringIO()
+    play_match(
+        Match(KALAH, start),
+        NAMES,
+        stdin,
+        stdout,
+        computers={Player.NORTH: ScriptedStrategy(0)},
+    )
+    assert mock_read_move.call_args_list == [call("Heinrich", stdin, stdout)] * 2
+
+
 def test_main_plays_the_requested_variant(mock_play_match: MagicMock) -> None:
     main(["--variant", "oware"])
     assert mock_play_match.call_args.args[0].rules is variants.get("oware")
@@ -325,6 +381,49 @@ def test_main_defaults_the_player_names(mock_play_match: MagicMock) -> None:
         Player.SOUTH: "Player 1",
         Player.NORTH: "Player 2",
     }
+
+
+@pytest.mark.parametrize(
+    ("difficulty", "cls"), [("easy", RandomPlayer), ("hard", MinimaxPlayer)]
+)
+def test_main_puts_a_computer_of_the_chosen_difficulty_on_north(
+    mock_play_match: MagicMock, difficulty: str, cls: type
+) -> None:
+    main(["--computer", difficulty])
+    computers = mock_play_match.call_args.kwargs["computers"]
+    assert set(computers) == {Player.NORTH}
+    assert isinstance(computers[Player.NORTH], cls)
+
+
+def test_main_names_the_computer_after_its_difficulty(
+    mock_play_match: MagicMock,
+) -> None:
+    main(["--computer", "medium"])
+    assert mock_play_match.call_args.args[1] == {
+        Player.SOUTH: "Player 1",
+        Player.NORTH: "Computer (medium)",
+    }
+
+
+def test_main_keeps_an_explicit_name_for_the_computer(
+    mock_play_match: MagicMock,
+) -> None:
+    main(["Ana", "HAL", "--computer", "easy"])
+    assert mock_play_match.call_args.args[1][Player.NORTH] == "HAL"
+
+
+def test_main_passes_no_computers_for_hot_seat_play(
+    mock_play_match: MagicMock,
+) -> None:
+    main([])
+    assert mock_play_match.call_args.kwargs["computers"] == {}
+
+
+def test_unknown_difficulty_is_rejected(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit) as exc:
+        main(["--computer", "grandmaster"])
+    assert exc.value.code == 2
+    assert "invalid choice: 'grandmaster'" in capsys.readouterr().err
 
 
 def test_main_passes_the_streams_to_the_match_loop(mock_play_match: MagicMock) -> None:

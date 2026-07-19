@@ -2,11 +2,13 @@
 
 import argparse
 import sys
+from collections.abc import Mapping
 from typing import TextIO
 
-from mancala import variants
+from mancala import players, variants
 from mancala.events import Captured, Event, ExtraTurn, GameOver, SeedSown, SeedStored
 from mancala.match import Match
+from mancala.players import Strategy
 from mancala.rules import IllegalMoveError, Move
 from mancala.state import GameState, Player
 
@@ -22,8 +24,13 @@ def main(
     parser.add_argument(
         "--seeds", type=int, default=4, help="seeds per cup (kalah: 3-6)"
     )
+    parser.add_argument(
+        "--computer",
+        choices=players.available(),
+        help="let the computer play as player 2 at this difficulty",
+    )
     parser.add_argument("player1", nargs="?", default="Player 1", help="Player 1 name")
-    parser.add_argument("player2", nargs="?", default="Player 2", help="Player 2 name")
+    parser.add_argument("player2", nargs="?", help="Player 2 name")
     args = parser.parse_args(argv)
 
     rules = variants.get(args.variant)
@@ -31,24 +38,48 @@ def main(
         match = Match(rules, rules.initial_state(args.seeds))
     except ValueError as error:
         parser.error(str(error))
-    names = {Player.SOUTH: args.player1, Player.NORTH: args.player2}
+    if args.player2 is not None:
+        player2 = args.player2
+    elif args.computer is not None:
+        player2 = f"Computer ({args.computer})"
+    else:
+        player2 = "Player 2"
+    names = {Player.SOUTH: args.player1, Player.NORTH: player2}
+    computers = (
+        {Player.NORTH: players.get(args.computer)} if args.computer is not None else {}
+    )
     return play_match(
         match,
         names,
         stdin if stdin is not None else sys.stdin,
         stdout if stdout is not None else sys.stdout,
+        computers=computers,
     )
 
 
 def play_match(
-    match: Match, names: dict[Player, str], stdin: TextIO, stdout: TextIO
+    match: Match,
+    names: dict[Player, str],
+    stdin: TextIO,
+    stdout: TextIO,
+    computers: Mapping[Player, Strategy] | None = None,
 ) -> int:
-    """Run the interactive loop: 0 when the game is played out, 1 when abandoned."""
+    """Run the interactive loop: 0 when the game is played out, 1 when abandoned.
+
+    Players in `computers` have their moves chosen by the mapped strategy
+    instead of being prompted for input.
+    """
+    computers = computers if computers is not None else {}
     while not match.is_over:
         print(file=stdout)
         print(render_board(match.state, names), file=stdout)
         mover = match.state.current_player
-        move = read_move(names[mover], stdin, stdout)
+        strategy = computers.get(mover)
+        if strategy is not None:
+            move = strategy.choose(match.rules, match.state)
+            print(f"{names[mover]} chooses cup {move + 1}.", file=stdout)
+        else:
+            move = read_move(names[mover], stdin, stdout)
         if move is None:
             print(file=stdout)
             print("Game abandoned.", file=stdout)
