@@ -2,15 +2,50 @@
 
 import argparse
 import sys
-from collections.abc import Mapping
-from typing import TextIO
+from typing import Protocol, TextIO
 
-from mancala import players, variants
+from mancala import strategies, variants
 from mancala.events import Captured, Event, ExtraTurn, GameOver, SeedSown, SeedStored
 from mancala.match import Match
-from mancala.players import Strategy
 from mancala.rules import IllegalMoveError, Move
 from mancala.state import GameState, Player
+from mancala.strategies import Strategy
+
+
+class TerminalPlayer(Protocol):
+    """One side of a match played at the terminal."""
+
+    name: str
+
+    def get_move(self, match: Match) -> Move | None:
+        """The move to play next; None to abandon the game."""
+
+
+class HumanPlayer:
+    """Prompts at the terminal for a cup to sow."""
+
+    def __init__(self, name: str, stdin: TextIO, stdout: TextIO) -> None:
+        self.name = name
+        self._stdin = stdin
+        self._stdout = stdout
+
+    def get_move(self, match: Match) -> Move | None:
+        del match  # the human reads the position off the board on screen
+        return read_move(self.name, self._stdin, self._stdout)
+
+
+class ComputerPlayer:
+    """Picks a move with a strategy and announces it."""
+
+    def __init__(self, name: str, strategy: Strategy, stdout: TextIO) -> None:
+        self.name = name
+        self._strategy = strategy
+        self._stdout = stdout
+
+    def get_move(self, match: Match) -> Move:
+        move = self._strategy.choose(match)
+        print(f"{self.name} chooses cup {move + 1}.", file=self._stdout)
+        return move
 
 
 def main(
@@ -26,60 +61,48 @@ def main(
     )
     parser.add_argument(
         "--computer",
-        choices=players.available(),
+        choices=strategies.available(),
         help="let the computer play as player 2 at this difficulty",
     )
     parser.add_argument("player1", nargs="?", default="Player 1", help="Player 1 name")
     parser.add_argument("player2", nargs="?", help="Player 2 name")
     args = parser.parse_args(argv)
 
+    if args.computer is not None and args.player2 is not None:
+        parser.error("player2 cannot be named when --computer plays that side")
     rules = variants.get(args.variant)
     try:
         match = Match(rules, rules.initial_state(args.seeds))
     except ValueError as error:
         parser.error(str(error))
-    if args.player2 is not None:
-        player2 = args.player2
-    elif args.computer is not None:
-        player2 = f"Computer ({args.computer})"
+
+    stdin = stdin if stdin is not None else sys.stdin
+    stdout = stdout if stdout is not None else sys.stdout
+    south = HumanPlayer(args.player1, stdin, stdout)
+    north: TerminalPlayer
+    if args.computer is not None:
+        north = ComputerPlayer(
+            f"Computer ({args.computer})", strategies.get(args.computer), stdout
+        )
     else:
-        player2 = "Player 2"
-    names = {Player.SOUTH: args.player1, Player.NORTH: player2}
-    computers = (
-        {Player.NORTH: players.get(args.computer)} if args.computer is not None else {}
-    )
-    return play_match(
-        match,
-        names,
-        stdin if stdin is not None else sys.stdin,
-        stdout if stdout is not None else sys.stdout,
-        computers=computers,
-    )
+        name = args.player2 if args.player2 is not None else "Player 2"
+        north = HumanPlayer(name, stdin, stdout)
+    return play_match(match, (south, north), stdout)
 
 
 def play_match(
-    match: Match,
-    names: dict[Player, str],
-    stdin: TextIO,
-    stdout: TextIO,
-    computers: Mapping[Player, Strategy] | None = None,
+    match: Match, players: tuple[TerminalPlayer, TerminalPlayer], stdout: TextIO
 ) -> int:
     """Run the interactive loop: 0 when the game is played out, 1 when abandoned.
 
-    Players in `computers` have their moves chosen by the mapped strategy
-    instead of being prompted for input.
+    `players` is indexed by `Player.value`, so south moves first.
     """
-    computers = computers if computers is not None else {}
+    names = {side: players[side.value].name for side in Player}
     while not match.is_over:
         print(file=stdout)
         print(render_board(match.state, names), file=stdout)
         mover = match.state.current_player
-        strategy = computers.get(mover)
-        if strategy is not None:
-            move = strategy.choose(match.rules, match.state, match.seen)
-            print(f"{names[mover]} chooses cup {move + 1}.", file=stdout)
-        else:
-            move = read_move(names[mover], stdin, stdout)
+        move = players[mover.value].get_move(match)
         if move is None:
             print(file=stdout)
             print("Game abandoned.", file=stdout)

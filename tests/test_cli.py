@@ -1,6 +1,6 @@
 import io
 import sys
-from collections.abc import Set
+from typing import TextIO
 from unittest.mock import MagicMock, call
 
 import pytest
@@ -9,6 +9,8 @@ from pytest_mock import MockerFixture
 
 from mancala import variants
 from mancala.cli import (
+    ComputerPlayer,
+    HumanPlayer,
     describe_move,
     describe_result,
     main,
@@ -18,9 +20,8 @@ from mancala.cli import (
 )
 from mancala.events import Captured, ExtraTurn, GameOver, SeedSown, SeedStored
 from mancala.match import Match
-from mancala.players import MinimaxPlayer, RandomPlayer
-from mancala.rules import Move, Rules
-from mancala.state import GameState, Player
+from mancala.rules import Move
+from mancala.state import Player
 from mancala.variants.kalah import Kalah
 
 KALAH = Kalah()
@@ -29,21 +30,19 @@ ENDGAME = make_state(south=(0, 0, 0, 0, 0, 1), north=(0,) * 6, stores=(23, 24))
 
 
 class ScriptedStrategy:
-    """A computer player that plays a fixed sequence of moves."""
+    """A strategy that plays a fixed sequence of moves and records the matches."""
 
     def __init__(self, *moves: Move) -> None:
         self._moves = iter(moves)
-        self.histories: list[Set[GameState]] = []
+        self.matches: list[Match] = []
 
-    def choose(
-        self,
-        rules: Rules,
-        state: GameState,
-        history: Set[GameState] = frozenset(),
-    ) -> Move:
-        del rules, state
-        self.histories.append(history)
+    def choose(self, match: Match) -> Move:
+        self.matches.append(match)
         return next(self._moves)
+
+
+def humans(stdin: TextIO, stdout: TextIO) -> tuple[HumanPlayer, HumanPlayer]:
+    return HumanPlayer("Heinrich", stdin, stdout), HumanPlayer("Nora", stdin, stdout)
 
 
 @pytest.fixture
@@ -210,29 +209,62 @@ def test_read_move_explains_an_out_of_range_rejection(cup: int) -> None:
     )
 
 
+def test_human_player_prompts_by_name_and_returns_the_move(
+    mock_read_move: MagicMock,
+) -> None:
+    mock_read_move.return_value = 5
+    stdin, stdout = io.StringIO(), io.StringIO()
+    assert HumanPlayer("Ana", stdin, stdout).get_move(Match(KALAH, ENDGAME)) == 5
+    assert mock_read_move.call_args_list == [call("Ana", stdin, stdout)]
+
+
+def test_computer_player_chooses_with_its_strategy() -> None:
+    assert (
+        ComputerPlayer("HAL", ScriptedStrategy(5), io.StringIO()).get_move(
+            Match(KALAH, ENDGAME)
+        )
+        == 5
+    )
+
+
+def test_computer_player_hands_the_match_to_its_strategy() -> None:
+    strategy = ScriptedStrategy(5)
+    match = Match(KALAH, ENDGAME)
+    ComputerPlayer("HAL", strategy, io.StringIO()).get_move(match)
+    assert strategy.matches == [match]
+
+
+def test_computer_player_announces_its_choice() -> None:
+    stdout = io.StringIO()
+    ComputerPlayer("HAL", ScriptedStrategy(5), stdout).get_move(Match(KALAH, ENDGAME))
+    assert stdout.getvalue() == "HAL chooses cup 6.\n"
+
+
 def test_play_match_returns_0_for_a_game_played_to_completion(
     mock_read_move: MagicMock,
 ) -> None:
     mock_read_move.side_effect = [5]
-    assert play_match(Match(KALAH, ENDGAME), NAMES, io.StringIO(), io.StringIO()) == 0
+    stdout = io.StringIO()
+    assert play_match(Match(KALAH, ENDGAME), humans(io.StringIO(), stdout), stdout) == 0
 
 
 def test_play_match_returns_1_when_input_runs_out(mock_read_move: MagicMock) -> None:
     mock_read_move.side_effect = [None]
-    assert play_match(Match(KALAH, ENDGAME), NAMES, io.StringIO(), io.StringIO()) == 1
+    stdout = io.StringIO()
+    assert play_match(Match(KALAH, ENDGAME), humans(io.StringIO(), stdout), stdout) == 1
 
 
 def test_play_match_reports_an_abandoned_game(mock_read_move: MagicMock) -> None:
     mock_read_move.side_effect = [None]
     stdout = io.StringIO()
-    play_match(Match(KALAH, ENDGAME), NAMES, io.StringIO(), stdout)
+    play_match(Match(KALAH, ENDGAME), humans(io.StringIO(), stdout), stdout)
     assert stdout.getvalue().endswith("\nGame abandoned.\n")
 
 
 def test_play_match_prompts_the_current_player(mock_read_move: MagicMock) -> None:
     mock_read_move.side_effect = [5]
     stdin, stdout = io.StringIO(), io.StringIO()
-    play_match(Match(KALAH, ENDGAME), NAMES, stdin, stdout)
+    play_match(Match(KALAH, ENDGAME), humans(stdin, stdout), stdout)
     assert mock_read_move.call_args_list == [call("Heinrich", stdin, stdout)]
 
 
@@ -242,7 +274,7 @@ def test_play_match_prompts_the_players_in_turn_order(
     mock_read_move.side_effect = [0, 0, None]
     start = make_state(south=(1, 1, 0, 0, 0, 0), north=(1, 0, 0, 0, 0, 0))
     stdin, stdout = io.StringIO(), io.StringIO()
-    play_match(Match(KALAH, start), NAMES, stdin, stdout)
+    play_match(Match(KALAH, start), humans(stdin, stdout), stdout)
     assert mock_read_move.call_args_list == [
         call("Heinrich", stdin, stdout),
         call("Nora", stdin, stdout),
@@ -256,21 +288,21 @@ def test_play_match_prompts_the_same_player_after_an_extra_turn(
     mock_read_move.side_effect = [5, None]
     start = make_state(south=(1, 0, 0, 0, 0, 1), north=(1, 0, 0, 0, 0, 0))
     stdin, stdout = io.StringIO(), io.StringIO()
-    play_match(Match(KALAH, start), NAMES, stdin, stdout)
+    play_match(Match(KALAH, start), humans(stdin, stdout), stdout)
     assert mock_read_move.call_args_list == [call("Heinrich", stdin, stdout)] * 2
 
 
 def test_play_match_narrates_the_move(mock_read_move: MagicMock) -> None:
     mock_read_move.side_effect = [5]
     stdout = io.StringIO()
-    play_match(Match(KALAH, ENDGAME), NAMES, io.StringIO(), stdout)
+    play_match(Match(KALAH, ENDGAME), humans(io.StringIO(), stdout), stdout)
     assert "Heinrich sows 1 seed from cup 6.\nThe game is over.\n" in stdout.getvalue()
 
 
 def test_play_match_announces_the_result(mock_read_move: MagicMock) -> None:
     mock_read_move.side_effect = [5]
     stdout = io.StringIO()
-    play_match(Match(KALAH, ENDGAME), NAMES, io.StringIO(), stdout)
+    play_match(Match(KALAH, ENDGAME), humans(io.StringIO(), stdout), stdout)
     assert stdout.getvalue().endswith("It's a draw, 24-24.\n")
 
 
@@ -279,7 +311,8 @@ def test_play_match_renders_the_board_before_the_move_and_after_the_game(
 ) -> None:
     mock_read_move.side_effect = [5]
     match = Match(KALAH, ENDGAME)
-    play_match(match, NAMES, io.StringIO(), io.StringIO())
+    stdout = io.StringIO()
+    play_match(match, humans(io.StringIO(), stdout), stdout)
     assert mock_render_board.call_args_list == [
         call(ENDGAME, NAMES),
         call(match.state, NAMES),
@@ -291,7 +324,8 @@ def test_play_match_renders_the_current_position_each_round(
 ) -> None:
     mock_read_move.side_effect = [0, 0, None]
     start = make_state(south=(1, 1, 0, 0, 0, 0), north=(1, 0, 0, 0, 0, 0))
-    play_match(Match(KALAH, start), NAMES, io.StringIO(), io.StringIO())
+    stdout = io.StringIO()
+    play_match(Match(KALAH, start), humans(io.StringIO(), stdout), stdout)
     assert mock_render_board.call_args_list == [
         call(start, NAMES),
         call(
@@ -309,58 +343,24 @@ def test_play_match_renders_the_current_position_each_round(
 def test_play_match_reports_an_illegal_move(mock_read_move: MagicMock) -> None:
     mock_read_move.side_effect = [0, 5]
     stdout = io.StringIO()
-    play_match(Match(KALAH, ENDGAME), NAMES, io.StringIO(), stdout)
+    play_match(Match(KALAH, ENDGAME), humans(io.StringIO(), stdout), stdout)
     assert "Cup 1 is not a legal move.\n" in stdout.getvalue()
 
 
 def test_play_match_asks_again_after_an_illegal_move(mock_read_move: MagicMock) -> None:
     mock_read_move.side_effect = [0, 5]
     stdin, stdout = io.StringIO(), io.StringIO()
-    play_match(Match(KALAH, ENDGAME), NAMES, stdin, stdout)
+    play_match(Match(KALAH, ENDGAME), humans(stdin, stdout), stdout)
     assert mock_read_move.call_args_list == [call("Heinrich", stdin, stdout)] * 2
 
 
 def test_play_match_lets_a_computer_move_without_prompting(
     mock_read_move: MagicMock,
 ) -> None:
-    exit_code = play_match(
-        Match(KALAH, ENDGAME),
-        NAMES,
-        io.StringIO(),
-        io.StringIO(),
-        computers={Player.SOUTH: ScriptedStrategy(5)},
-    )
-    assert exit_code == 0
-    mock_read_move.assert_not_called()
-
-
-def test_play_match_announces_the_computers_choice(
-    mock_read_move: MagicMock,
-) -> None:
     stdout = io.StringIO()
-    play_match(
-        Match(KALAH, ENDGAME),
-        NAMES,
-        io.StringIO(),
-        stdout,
-        computers={Player.SOUTH: ScriptedStrategy(5)},
-    )
-    assert "Heinrich chooses cup 6.\n" in stdout.getvalue()
-    mock_read_move.assert_not_called()
-
-
-def test_play_match_passes_the_seen_states_to_the_strategy(
-    mock_read_move: MagicMock,
-) -> None:
-    strategy = ScriptedStrategy(5)
-    play_match(
-        Match(KALAH, ENDGAME),
-        NAMES,
-        io.StringIO(),
-        io.StringIO(),
-        computers={Player.SOUTH: strategy},
-    )
-    assert strategy.histories == [frozenset({ENDGAME})]
+    computer = ComputerPlayer("Heinrich", ScriptedStrategy(5), stdout)
+    _, north = humans(io.StringIO(), stdout)
+    assert play_match(Match(KALAH, ENDGAME), (computer, north), stdout) == 0
     mock_read_move.assert_not_called()
 
 
@@ -368,13 +368,9 @@ def test_play_match_still_prompts_the_human_side(mock_read_move: MagicMock) -> N
     mock_read_move.side_effect = [0, None]
     start = make_state(south=(1, 1, 0, 0, 0, 0), north=(1, 0, 0, 0, 0, 0))
     stdin, stdout = io.StringIO(), io.StringIO()
-    play_match(
-        Match(KALAH, start),
-        NAMES,
-        stdin,
-        stdout,
-        computers={Player.NORTH: ScriptedStrategy(0)},
-    )
+    south, _ = humans(stdin, stdout)
+    computer = ComputerPlayer("Nora", ScriptedStrategy(0), stdout)
+    play_match(Match(KALAH, start), (south, computer), stdout)
     assert mock_read_move.call_args_list == [call("Heinrich", stdin, stdout)] * 2
 
 
@@ -392,54 +388,61 @@ def test_main_builds_the_initial_board_with_the_requested_seeds(
 
 def test_main_assigns_the_player_names(mock_play_match: MagicMock) -> None:
     main(["Ana", "Ben"])
-    assert mock_play_match.call_args.args[1] == {
-        Player.SOUTH: "Ana",
-        Player.NORTH: "Ben",
-    }
+    assert [player.name for player in mock_play_match.call_args.args[1]] == [
+        "Ana",
+        "Ben",
+    ]
 
 
 def test_main_defaults_the_player_names(mock_play_match: MagicMock) -> None:
     main([])
-    assert mock_play_match.call_args.args[1] == {
-        Player.SOUTH: "Player 1",
-        Player.NORTH: "Player 2",
-    }
+    assert [player.name for player in mock_play_match.call_args.args[1]] == [
+        "Player 1",
+        "Player 2",
+    ]
 
 
-@pytest.mark.parametrize(
-    ("difficulty", "cls"), [("easy", RandomPlayer), ("hard", MinimaxPlayer)]
-)
-def test_main_puts_a_computer_of_the_chosen_difficulty_on_north(
-    mock_play_match: MagicMock, difficulty: str, cls: type
+def test_main_seats_two_humans_for_hot_seat_play(mock_play_match: MagicMock) -> None:
+    main([])
+    south, north = mock_play_match.call_args.args[1]
+    assert isinstance(south, HumanPlayer)
+    assert isinstance(north, HumanPlayer)
+
+
+def test_main_puts_a_computer_on_north(mock_play_match: MagicMock) -> None:
+    main(["--computer", "easy"])
+    south, north = mock_play_match.call_args.args[1]
+    assert isinstance(south, HumanPlayer)
+    assert isinstance(north, ComputerPlayer)
+
+
+@pytest.mark.usefixtures("mock_play_match")
+def test_main_builds_the_strategy_for_the_chosen_difficulty(
+    mocker: MockerFixture,
 ) -> None:
-    main(["--computer", difficulty])
-    computers = mock_play_match.call_args.kwargs["computers"]
-    assert set(computers) == {Player.NORTH}
-    assert isinstance(computers[Player.NORTH], cls)
+    get = mocker.patch("mancala.cli.strategies.get")
+    main(["--computer", "hard"])
+    get.assert_called_once_with("hard")
 
 
 def test_main_names_the_computer_after_its_difficulty(
     mock_play_match: MagicMock,
 ) -> None:
     main(["--computer", "medium"])
-    assert mock_play_match.call_args.args[1] == {
-        Player.SOUTH: "Player 1",
-        Player.NORTH: "Computer (medium)",
-    }
+    _, north = mock_play_match.call_args.args[1]
+    assert north.name == "Computer (medium)"
 
 
-def test_main_keeps_an_explicit_name_for_the_computer(
-    mock_play_match: MagicMock,
+def test_main_rejects_naming_player2_when_the_computer_plays_that_side(
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    main(["Ana", "HAL", "--computer", "easy"])
-    assert mock_play_match.call_args.args[1][Player.NORTH] == "HAL"
-
-
-def test_main_passes_no_computers_for_hot_seat_play(
-    mock_play_match: MagicMock,
-) -> None:
-    main([])
-    assert mock_play_match.call_args.kwargs["computers"] == {}
+    with pytest.raises(SystemExit) as exc:
+        main(["Ana", "HAL", "--computer", "easy"])
+    assert exc.value.code == 2
+    assert (
+        "player2 cannot be named when --computer plays that side"
+        in capsys.readouterr().err
+    )
 
 
 def test_unknown_difficulty_is_rejected(capsys: pytest.CaptureFixture[str]) -> None:
@@ -449,15 +452,36 @@ def test_unknown_difficulty_is_rejected(capsys: pytest.CaptureFixture[str]) -> N
     assert "invalid choice: 'grandmaster'" in capsys.readouterr().err
 
 
-def test_main_passes_the_streams_to_the_match_loop(mock_play_match: MagicMock) -> None:
-    stdin, stdout = io.StringIO(), io.StringIO()
-    main([], stdin=stdin, stdout=stdout)
-    assert mock_play_match.call_args.args[2:] == (stdin, stdout)
+def test_main_passes_the_output_stream_to_the_match_loop(
+    mock_play_match: MagicMock,
+) -> None:
+    stdout = io.StringIO()
+    main([], stdin=io.StringIO(), stdout=stdout)
+    assert mock_play_match.call_args.args[2] is stdout
 
 
-def test_main_defaults_to_the_process_streams(mock_play_match: MagicMock) -> None:
+def test_main_gives_the_human_players_the_supplied_input_stream(
+    mock_play_match: MagicMock,
+) -> None:
+    main([], stdin=io.StringIO("3\n"), stdout=io.StringIO())
+    match, (south, _), _ = mock_play_match.call_args.args
+    assert south.get_move(match) == 2
+
+
+def test_main_defaults_to_the_process_output_stream(
+    mock_play_match: MagicMock,
+) -> None:
     main([])
-    assert mock_play_match.call_args.args[2:] == (sys.stdin, sys.stdout)
+    assert mock_play_match.call_args.args[2] is sys.stdout
+
+
+def test_main_defaults_to_the_process_input_stream(
+    mock_play_match: MagicMock, mocker: MockerFixture
+) -> None:
+    mocker.patch.object(sys, "stdin", io.StringIO("3\n"))
+    main([])
+    match, (south, _), _ = mock_play_match.call_args.args
+    assert south.get_move(match) == 2
 
 
 def test_main_returns_the_match_loops_exit_code(mock_play_match: MagicMock) -> None:
