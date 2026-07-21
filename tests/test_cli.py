@@ -410,9 +410,23 @@ def test_main_seats_two_humans_for_hot_seat_play(mock_play_match: MagicMock) -> 
 
 
 def test_main_puts_a_computer_on_north(mock_play_match: MagicMock) -> None:
-    main(["--computer", "easy"])
+    main(["Ana", "cpu:easy"])
     south, north = mock_play_match.call_args.args[1]
     assert isinstance(south, HumanPlayer)
+    assert isinstance(north, ComputerPlayer)
+
+
+def test_main_puts_a_computer_on_south(mock_play_match: MagicMock) -> None:
+    main(["cpu:easy", "Ben"])
+    south, north = mock_play_match.call_args.args[1]
+    assert isinstance(south, ComputerPlayer)
+    assert isinstance(north, HumanPlayer)
+
+
+def test_main_seats_two_computers(mock_play_match: MagicMock) -> None:
+    main(["cpu:easy", "cpu:hard"])
+    south, north = mock_play_match.call_args.args[1]
+    assert isinstance(south, ComputerPlayer)
     assert isinstance(north, ComputerPlayer)
 
 
@@ -421,35 +435,39 @@ def test_main_builds_the_strategy_for_the_chosen_difficulty(
     mocker: MockerFixture,
 ) -> None:
     get = mocker.patch("mancala.cli.strategies.get")
-    main(["--computer", "hard"])
+    main(["Ana", "cpu:hard"])
     get.assert_called_once_with("hard")
 
 
 def test_main_names_the_computer_after_its_difficulty(
     mock_play_match: MagicMock,
 ) -> None:
-    main(["--computer", "medium"])
+    main(["Ana", "cpu:medium"])
     _, north = mock_play_match.call_args.args[1]
     assert north.name == "Computer (medium)"
 
 
-def test_main_rejects_naming_player2_when_the_computer_plays_that_side(
+def test_main_treats_a_bare_cpu_as_a_human_name(mock_play_match: MagicMock) -> None:
+    main(["cpu", "Ben"])
+    south, _ = mock_play_match.call_args.args[1]
+    assert isinstance(south, HumanPlayer)
+    assert south.name == "cpu"
+
+
+def test_main_rejects_an_unknown_difficulty(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     with pytest.raises(SystemExit) as exc:
-        main(["Ana", "HAL", "--computer", "easy"])
+        main(["Ana", "cpu:grandmaster"])
     assert exc.value.code == 2
-    assert (
-        "player2 cannot be named when --computer plays that side"
-        in capsys.readouterr().err
-    )
+    assert "unknown difficulty 'grandmaster'" in capsys.readouterr().err
 
 
-def test_unknown_difficulty_is_rejected(capsys: pytest.CaptureFixture[str]) -> None:
+def test_main_rejects_an_empty_difficulty(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit) as exc:
-        main(["--computer", "grandmaster"])
+        main(["Ana", "cpu:"])
     assert exc.value.code == 2
-    assert "invalid choice: 'grandmaster'" in capsys.readouterr().err
+    assert "unknown difficulty ''" in capsys.readouterr().err
 
 
 def test_main_passes_the_output_stream_to_the_match_loop(

@@ -8,9 +8,11 @@ for hot-seat play or play against the computer.
 
     uv run mancala --variant kalah Heinrich Nora
 
-Or take on the computer at `easy`, `medium`, or `hard`:
+Name a seat `cpu:<difficulty>` (`easy`, `medium`, or `hard`) to hand it to the
+computer — either seat, or both:
 
-    uv run mancala --computer hard Heinrich
+    uv run mancala Heinrich cpu:hard
+    uv run mancala cpu:easy cpu:hard
 
 ## Develop
 

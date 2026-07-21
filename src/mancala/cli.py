@@ -48,6 +48,19 @@ class ComputerPlayer:
         return move
 
 
+CPU_PREFIX = "cpu:"
+
+
+def build_player(spec: str, stdin: TextIO, stdout: TextIO) -> TerminalPlayer:
+    """A computer for a `cpu:<difficulty>` spec, otherwise a human named `spec`."""
+    if spec.startswith(CPU_PREFIX):
+        difficulty = spec.removeprefix(CPU_PREFIX)
+        return ComputerPlayer(
+            f"Computer ({difficulty})", strategies.get(difficulty), stdout
+        )
+    return HumanPlayer(spec, stdin, stdout)
+
+
 def main(
     argv: list[str] | None = None,
     *,
@@ -60,33 +73,22 @@ def main(
         "--seeds", type=int, default=4, help="seeds per cup (kalah: 3-6)"
     )
     parser.add_argument(
-        "--computer",
-        choices=strategies.available(),
-        help="let the computer play as player 2 at this difficulty",
+        "player1", nargs="?", default="Player 1", help="name, or cpu:<difficulty>"
     )
-    parser.add_argument("player1", nargs="?", default="Player 1", help="Player 1 name")
-    parser.add_argument("player2", nargs="?", help="Player 2 name")
+    parser.add_argument(
+        "player2", nargs="?", default="Player 2", help="name, or cpu:<difficulty>"
+    )
     args = parser.parse_args(argv)
 
-    if args.computer is not None and args.player2 is not None:
-        parser.error("player2 cannot be named when --computer plays that side")
     rules = variants.get(args.variant)
-    try:
-        match = Match(rules, rules.initial_state(args.seeds))
-    except ValueError as error:
-        parser.error(str(error))
-
     stdin = stdin if stdin is not None else sys.stdin
     stdout = stdout if stdout is not None else sys.stdout
-    south = HumanPlayer(args.player1, stdin, stdout)
-    north: TerminalPlayer
-    if args.computer is not None:
-        north = ComputerPlayer(
-            f"Computer ({args.computer})", strategies.get(args.computer), stdout
-        )
-    else:
-        name = args.player2 if args.player2 is not None else "Player 2"
-        north = HumanPlayer(name, stdin, stdout)
+    try:
+        match = Match(rules, rules.initial_state(args.seeds))
+        south = build_player(args.player1, stdin, stdout)
+        north = build_player(args.player2, stdin, stdout)
+    except ValueError as error:
+        parser.error(str(error))
     return play_match(match, (south, north), stdout)
 
 
