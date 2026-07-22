@@ -2,7 +2,7 @@
 
 Mancala family board games — a modern resurrection of an ancient student
 project. Immutable game engine (Kalah and Oware) plus a terminal interface
-for hot-seat play.
+for hot-seat play or play against the computer.
 
 ## Play
 
@@ -18,6 +18,12 @@ it later with:
 A save file records the variant, player names, current position, and the
 full move history; on load the history is replayed and validated before
 play resumes.
+
+Name a seat `cpu:<difficulty>` (`easy`, `medium`, or `hard`) to hand it to the
+computer — either seat, or both:
+
+    uv run mancala new Heinrich cpu:hard
+    uv run mancala new cpu:easy cpu:hard
 
 ## Develop
 

@@ -1,7 +1,9 @@
 """Save and resume games as JSON documents.
 
-A save document records metadata (variant, seed count, player names, save
-time), the move history, and the current state. Loading replays the history
+A save document records metadata (variant, seed count, player specs, save
+time), the move history, and the current state. A player spec is a name for a
+human seat or `cpu:<difficulty>` for a computer one, so a resumed game seats
+the same players. Loading replays the history
 from the variant's initial position, which rebuilds everything a `Match`
 tracks — including the set of seen states that Oware's repetition rule
 needs — and validates the document in full: every recorded move must be
@@ -26,9 +28,9 @@ class SaveError(Exception):
     """The save document is malformed, inconsistent, or unwritable."""
 
 
-def dump(match: Match, names: dict[Player, str], file: str | Path) -> None:
+def dump(match: Match, specs: dict[Player, str], file: str | Path) -> None:
     """Write `match` to `file`. Raises SaveError or OSError on failure."""
-    document = to_document(match, names)
+    document = to_document(match, specs)
     Path(file).write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
 
 
@@ -42,7 +44,7 @@ def load(file: str | Path) -> tuple[Match, dict[Player, str]]:
     return from_document(document)
 
 
-def to_document(match: Match, names: dict[Player, str]) -> dict[str, object]:
+def to_document(match: Match, specs: dict[Player, str]) -> dict[str, object]:
     """Serialize `match` to a JSON-compatible document."""
     initial = match.history[0][0] if match.history else match.state
     seeds = initial.board[0][0]
@@ -58,7 +60,7 @@ def to_document(match: Match, names: dict[Player, str]) -> dict[str, object]:
         "metadata": {
             "variant": match.rules.name,
             "seeds_per_cup": seeds,
-            "players": {p.name.lower(): names[p] for p in Player},
+            "players": {p.name.lower(): specs[p] for p in Player},
             "saved_at": datetime.now(UTC).isoformat(),
         },
         "history": [move for _, move, _ in match.history],
@@ -67,7 +69,7 @@ def to_document(match: Match, names: dict[Player, str]) -> dict[str, object]:
 
 
 def from_document(document: object) -> tuple[Match, dict[Player, str]]:
-    """Rebuild the match and player names from a save document.
+    """Rebuild the match and player specs from a save document.
 
     Raises SaveError unless the document is well-formed, every move in its
     history replays legally, and the recorded state matches the replayed one.
@@ -80,7 +82,7 @@ def from_document(document: object) -> tuple[Match, dict[Player, str]]:
     metadata = _mapping(doc.get("metadata"), "metadata")
     _string(metadata.get("saved_at"), "saved_at")
     players = _mapping(metadata.get("players"), "players")
-    names = {p: _string(players.get(p.name.lower()), p.name.lower()) for p in Player}
+    specs = {p: _string(players.get(p.name.lower()), p.name.lower()) for p in Player}
     try:
         rules = variants.get(_string(metadata.get("variant"), "variant"))
         initial = rules.initial_state(
@@ -101,7 +103,7 @@ def from_document(document: object) -> tuple[Match, dict[Player, str]]:
             ) from error
     if doc.get("state") != _state_document(match.state):
         raise SaveError("recorded state does not match the state replayed from history")
-    return match, names
+    return match, specs
 
 
 def _state_document(state: GameState) -> dict[str, object]:
