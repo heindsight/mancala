@@ -2,9 +2,10 @@
 
 import argparse
 import sys
+from dataclasses import dataclass
 from typing import Protocol, TextIO
 
-from mancala import strategies, variants
+from mancala import save, strategies, variants
 from mancala.events import Captured, Event, ExtraTurn, GameOver, SeedSown, SeedStored
 from mancala.match import Match
 from mancala.rules import IllegalMoveError, Move
@@ -12,13 +13,21 @@ from mancala.state import GameState, Player
 from mancala.strategies import Strategy
 
 
+@dataclass(frozen=True, slots=True)
+class SaveGame:
+    """The player asked to save the game to `file` instead of moving."""
+
+    file: str
+
+
 class TerminalPlayer(Protocol):
     """One side of a match played at the terminal."""
 
     name: str
+    spec: str
 
-    def get_move(self, match: Match) -> Move | None:
-        """The move to play next; None to abandon the game."""
+    def get_move(self, match: Match) -> Move | SaveGame | None:
+        """The move to play next; None to abandon, SaveGame to save and exit."""
 
 
 class HumanPlayer:
@@ -26,10 +35,11 @@ class HumanPlayer:
 
     def __init__(self, name: str, stdin: TextIO, stdout: TextIO) -> None:
         self.name = name
+        self.spec = name
         self._stdin = stdin
         self._stdout = stdout
 
-    def get_move(self, match: Match) -> Move | None:
+    def get_move(self, match: Match) -> Move | SaveGame | None:
         del match  # the human reads the position off the board on screen
         return read_move(self.name, self._stdin, self._stdout)
 
@@ -37,8 +47,11 @@ class HumanPlayer:
 class ComputerPlayer:
     """Picks a move with a strategy and announces it."""
 
-    def __init__(self, name: str, strategy: Strategy, stdout: TextIO) -> None:
+    def __init__(
+        self, name: str, strategy: Strategy, stdout: TextIO, spec: str | None = None
+    ) -> None:
         self.name = name
+        self.spec = spec if spec is not None else name
         self._strategy = strategy
         self._stdout = stdout
 
@@ -56,7 +69,7 @@ def build_player(spec: str, stdin: TextIO, stdout: TextIO) -> TerminalPlayer:
     if spec.startswith(CPU_PREFIX):
         difficulty = spec.removeprefix(CPU_PREFIX)
         return ComputerPlayer(
-            f"Computer ({difficulty})", strategies.get(difficulty), stdout
+            f"Computer ({difficulty})", strategies.get(difficulty), stdout, spec
         )
     return HumanPlayer(spec, stdin, stdout)
 
@@ -68,28 +81,42 @@ def main(
     stdout: TextIO | None = None,
 ) -> int:
     parser = argparse.ArgumentParser(prog="mancala", description="Hot-seat mancala.")
-    parser.add_argument("--variant", choices=variants.available(), default="kalah")
-    parser.add_argument(
-        "--seeds", type=int, default=4, help="seeds per cup (kalah: 3-6)"
-    )
-    parser.add_argument(
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    new = subparsers.add_parser("new", help="start a new game")
+    new.add_argument("--variant", choices=variants.available(), default="kalah")
+    new.add_argument("--seeds", type=int, default=4, help="seeds per cup (kalah: 3-6)")
+    new.add_argument(
         "player1", nargs="?", default="Player 1", help="name, or cpu:<difficulty>"
     )
-    parser.add_argument(
+    new.add_argument(
         "player2", nargs="?", default="Player 2", help="name, or cpu:<difficulty>"
     )
+    resume = subparsers.add_parser("resume", help="resume a saved game")
+    resume.add_argument("file", help="save file written with 'save FILE'")
     args = parser.parse_args(argv)
 
-    rules = variants.get(args.variant)
     stdin = stdin if stdin is not None else sys.stdin
     stdout = stdout if stdout is not None else sys.stdout
+    if args.command == "resume":
+        try:
+            match, specs = save.load(args.file)
+        except (OSError, save.SaveError) as error:
+            resume.error(str(error))
+    else:
+        rules = variants.get(args.variant)
+        try:
+            match = Match(rules, rules.initial_state(args.seeds))
+        except ValueError as error:
+            new.error(str(error))
+        specs = {Player.SOUTH: args.player1, Player.NORTH: args.player2}
     try:
-        match = Match(rules, rules.initial_state(args.seeds))
-        south = build_player(args.player1, stdin, stdout)
-        north = build_player(args.player2, stdin, stdout)
+        players = (
+            build_player(specs[Player.SOUTH], stdin, stdout),
+            build_player(specs[Player.NORTH], stdin, stdout),
+        )
     except ValueError as error:
         parser.error(str(error))
-    return play_match(match, (south, north), stdout)
+    return play_match(match, players, stdout)
 
 
 def play_match(
@@ -109,6 +136,15 @@ def play_match(
             print(file=stdout)
             print("Game abandoned.", file=stdout)
             return 1
+        if isinstance(move, SaveGame):
+            specs = {side: players[side.value].spec for side in Player}
+            try:
+                save.dump(match, specs, move.file)
+            except (OSError, save.SaveError) as error:
+                print(f"Could not save: {error}.", file=stdout)
+                continue
+            print(f"Game saved to {move.file}.", file=stdout)
+            return 0
         try:
             result = match.play(move)
         except IllegalMoveError as error:
@@ -121,10 +157,18 @@ def play_match(
     return 0
 
 
-def read_move(name: str, stdin: TextIO, stdout: TextIO) -> Move | None:
-    """Prompt until `name` picks a cup between 1 and 6; None means the player quit."""
+def read_move(name: str, stdin: TextIO, stdout: TextIO) -> Move | SaveGame | None:
+    """Prompt until `name` picks a cup between 1 and 6 or asks to save the game.
+
+    None means the player quit.
+    """
     while True:
-        print(f"{name}, choose a cup (1-6): ", end="", file=stdout, flush=True)
+        print(
+            f"{name}, choose a cup (1-6) or 'save FILE': ",
+            end="",
+            file=stdout,
+            flush=True,
+        )
         try:
             line = stdin.readline()
         except KeyboardInterrupt:
@@ -132,6 +176,12 @@ def read_move(name: str, stdin: TextIO, stdout: TextIO) -> Move | None:
         if not line:
             return None
         text = line.strip()
+        command, _, argument = text.partition(" ")
+        if command == "save":
+            if file := argument.strip():
+                return SaveGame(file)
+            print("Say where to save the game: 'save FILE'.", file=stdout)
+            continue
         try:
             cup = int(text)
         except ValueError:
