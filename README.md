@@ -6,13 +6,24 @@ for hot-seat play or play against the computer.
 
 ## Play
 
-    uv run mancala --variant kalah Heinrich Nora
+    uv run mancala new --variant kalah Heinrich Nora
+
+## Save & resume
+
+Type `save FILE` instead of a cup number to save the game and exit. Resume
+it later with:
+
+    uv run mancala resume FILE
+
+A save file records the variant, player names, current position, and the
+full move history; on load the history is replayed and validated before
+play resumes.
 
 Name a seat `cpu:<difficulty>` (`easy`, `medium`, or `hard`) to hand it to the
 computer — either seat, or both:
 
-    uv run mancala Heinrich cpu:hard
-    uv run mancala cpu:easy cpu:hard
+    uv run mancala new Heinrich cpu:hard
+    uv run mancala new cpu:easy cpu:hard
 
 ## Develop
 
