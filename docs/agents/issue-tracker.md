@@ -1,6 +1,13 @@
 # Issue tracker: GitHub
 
-Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all operations.
+Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all operations — except when running unattended, see below.
+
+## Unattended runs
+
+In CI (`.github/workflows/agent.yml`) you hold no GitHub credential, and the conventions below do not apply.
+
+- **Read `.agent-brief.md`** in the repo root: the issue body as approved, plus owner-authored comments. Don't run `gh issue view`, and don't follow links out of the brief — only the brief was reviewed.
+- **Writes belong to the workflow**: push, PR, comment, close, labels. `gh` and `git push` are blocked tools.
 
 ## Conventions
 

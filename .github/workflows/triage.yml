@@ -1,0 +1,21 @@
+name: Triage
+
+on:
+  schedule:
+    - cron: "30 6 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: triage
+  cancel-in-progress: false
+
+jobs:
+  run:
+    permissions:
+      contents: read
+      issues: write
+    uses: heindsight/agent-workflows/.github/workflows/triage.yml@998978dda0e4b9a091353356f319b2dcd0af2892  # v1
+    secrets:
+      claude_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

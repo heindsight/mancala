@@ -1,0 +1,36 @@
+name: Agent
+
+on:
+  schedule:
+    - cron: "0 2 * * *"     # 02:00 UTC — capacity that otherwise expires unused
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: Issue number (overrides selection)
+        required: false
+
+permissions: {}
+
+concurrency:
+  group: agent-runner
+  cancel-in-progress: false
+
+jobs:
+  run:
+    # A called workflow can never exceed the calling job's grant, so this is the
+    # ceiling for every job inside agent-runner.yml (which narrows further).
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      id-token: write
+    uses: heindsight/agent-workflows/.github/workflows/agent-runner.yml@998978dda0e4b9a091353356f319b2dcd0af2892  # v1
+    with:
+      base:   main
+      issue:  ${{ inputs.issue || '' }}
+      setup:  uv sync --locked
+      verify: make lint && make test
+    secrets:
+      claude_token:     ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      context7_api_key: ${{ secrets.CONTEXT7_API_KEY }}
+      pr_token:         ${{ secrets.AGENT_PR_TOKEN }}
