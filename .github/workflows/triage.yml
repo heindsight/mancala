@@ -16,6 +16,6 @@ jobs:
     permissions:
       contents: read
       issues: write
-    uses: heindsight/agent-workflows/.github/workflows/triage.yml@998978dda0e4b9a091353356f319b2dcd0af2892  # v1
+    uses: heindsight/agent-workflows/.github/workflows/triage.yml@998978dda0e4b9a091353356f319b2dcd0af2892  # v2
     secrets:
       claude_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

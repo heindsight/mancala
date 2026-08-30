@@ -16,6 +16,11 @@
 # each config-repo release — or let Renovate do it, which is what the trailing
 # `# v1` comment is for; Renovate reads it to know which tag the SHA tracks.
 #
+# This script OWNS the trailing comment on the lines it rewrites: whatever
+# follows the SHA is replaced wholesale with `# <ref>`. That is what makes a
+# repin idempotent instead of stacking a second comment on each run, so don't
+# park other annotations there.
+#
 # Idempotent. Run from the root of a consuming repo.
 
 set -euo pipefail
@@ -29,9 +34,21 @@ if ! sha=$(gh api "repos/$CONFIG_REPO/commits/$REF" --jq '.sha' 2>/dev/null); th
 fi
 echo "$CONFIG_REPO@$REF -> $sha"
 
+# GitHub restricts repo names to [A-Za-z0-9._-], so `.` is the only ERE
+# metacharacter that can reach the match side.
+config_re=${CONFIG_REPO//./\\.}
+
+# On the replacement side `\` and `&` are special and `|` is the delimiter.
+# Backslash first, or it doubles the escapes added after it.
+safe_ref=${REF//\\/\\\\}
+safe_ref=${safe_ref//&/\\&}
+safe_ref=${safe_ref//|/\\|}
+
 # Matches both an unpinned `@v1` and an already-pinned `@<sha>  # v1`, so a
 # re-run after moving the tag rewrites cleanly rather than stacking comments.
-pattern="s|(uses: ${CONFIG_REPO}/\.github/workflows/[A-Za-z0-9._-]+\.yml)@[^[:space:]]+[[:space:]]*(#.*)?\$|\1@${sha}  # ${REF}|"
+# Anchored to the `uses:` key so the same text inside a `run:` block or a
+# comment is left alone; group 1 keeps the original indentation.
+pattern="s|^([[:space:]]*uses: ${config_re}/\.github/workflows/[A-Za-z0-9._-]+\.yml)@[^[:space:]]+[[:space:]]*(#.*)?\$|\1@${sha}  # ${safe_ref}|"
 
 changed=0
 for f in .github/workflows/*.yml; do
