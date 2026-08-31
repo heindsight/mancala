@@ -11,3 +11,10 @@ jobs:
     permissions:
       issues: write
     uses: heindsight/agent-workflows/.github/workflows/revoke-approval.yml@998978dda0e4b9a091353356f319b2dcd0af2892  # v2
+    with:
+      # Explicit because the pinned release defaults this to false, which
+      # exempts the owner's own edits. agent-runner.yml refuses any issue
+      # edited after approval regardless of who edited it, so that exemption
+      # would leave the issue labelled and permanently skipped. Redundant once
+      # this repo repins to a release where true is the default.
+      revoke_own_edits: true
