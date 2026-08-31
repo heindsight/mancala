@@ -1,16 +1,21 @@
 ---
 repos:
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.11.28
+    rev: d9fca3320346514799461a80b0753eb45d707d46  # frozen: 0.11.28
     hooks:
       - id: uv-lock
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.21
+    rev: 01a675ea018f2fb714478a5ffb83fcea8374bb06  # frozen: v0.15.21
     hooks:
       - id: ruff-check
         args: [ --fix ]
       - id: ruff-format
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
-    rev: a4727cbbcd26d7098e96b9cb738169b59711ae51  # v1.24.1
+    rev: a4727cbbcd26d7098e96b9cb738169b59711ae51  # frozen: v1.24.1
     hooks:
       - id: zizmor
+  - repo: https://github.com/renovatebot/pre-commit-hooks
+    rev: 66aa87b54ea1eb8d84f613942b4233db5f6ac749  # frozen: 44.52.1
+    hooks:
+      - id: renovate-config-validator
+        args: [ --strict ]
