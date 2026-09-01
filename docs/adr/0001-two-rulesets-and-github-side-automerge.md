@@ -1,31 +1,31 @@
 # Two rulesets on `main`, and GitHub-side automerge for Renovate
 
-Renovate merges its own dependency PRs, so `main` has to let a bot past the
-review requirement without letting it past anything else. `main` is therefore
-guarded by two rulesets: a **Review** ruleset carrying the `pull_request` rule,
-whose bypass list holds the repo-admin role and `renovate[bot]` with
-`bypass_mode: pull_request`, and a **Gates** ruleset carrying the required
-status checks, code scanning, code quality and code coverage, whose bypass list
-is empty. Renovate merges through `platformAutomerge`, so GitHub merges the PR
-once the gates go green.
+Renovate merges its own dependency PRs. So `main` must let the bot skip the
+review requirement, but nothing else. To do that, `main` has two rulesets
+instead of one:
+
+- **Review** — the `pull_request` rule. Its bypass list holds the repo-admin
+  role and `renovate[bot]`, with `bypass_mode: pull_request`.
+- **Checks** — the required status checks, code scanning, code quality and code
+  coverage. Its bypass list is empty.
+
+Renovate does not do the merging. It turns on GitHub's own auto-merge
+(`platformAutomerge`), and GitHub merges when the checks pass.
 
 ## Considered options
 
-**One ruleset.** That is what `main` had. A bypass actor is exempted from a
-whole ruleset, not from one rule inside it, so adding `renovate[bot]` to a
-ruleset that bundles review with the gates would let its PRs merge before CI
-had run.
+**One ruleset.** That is what `main` had. A bypass actor skips the whole
+ruleset, not one rule inside it. So putting `renovate[bot]` on a ruleset that
+holds both the review rule and the checks would let its PRs merge before CI ran.
 
-**Renovate-side automerge**, where Renovate reads the check results itself and
-merges on its next run. That is the right choice for a repo whose checks are
-not required, because then nothing else is reading them. Here the gates ruleset
-requires them and its bypass list is empty, so GitHub already refuses to merge
-a red PR, and letting GitHub merge is faster: it happens when the last check
-finishes, rather than at the next Renovate run.
+**Renovate-side automerge.** Renovate reads the check results itself and merges
+on its next run. Use that when the checks are not required, because then nothing
+else reads them. Here the Checks ruleset requires them and nobody can bypass it,
+so GitHub already refuses to merge a failing PR. Letting GitHub merge is also
+faster: it happens when the last check finishes, not at the next Renovate run.
 
 ## Consequences
 
-A gate only blocks a bot merge if it is on the gates ruleset's required-checks
-list: `checks (3.13)`, `checks (3.14)`, `zizmor`, and
-`renovate-config-validator`. A job that runs but is not required will not stop
-an automerge.
+A check blocks a bot merge only if it is on the Checks ruleset's required list:
+`checks (3.13)`, `checks (3.14)`, `zizmor`, and `renovate-config-validator`. A
+job that runs but is not required will not stop an automerge.

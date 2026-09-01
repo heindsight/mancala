@@ -2,9 +2,9 @@
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
   extends: [
     "config:recommended",
-    // The pre-commit manager is beta, and off unless enabled explicitly.
+    // Beta manager, off by default.
     ":enablePreCommit",
-    // Reads the `# renovate:` comments on `*_VERSION` env vars in ci.yml.
+    // Reads the `# renovate:` comments in ci.yml.
     "customManagers:githubActionsVersions",
     "helpers:pinGitHubActionDigests",
   ],
@@ -13,37 +13,33 @@
   minimumReleaseAge: "3 days",
 
   automerge: true,
-  // Safe: the gates ruleset requires status checks and its bypass list is
-  // empty, so GitHub refuses to merge a red PR. See docs/adr/0001.
+  // Safe: the Checks ruleset has no bypass. See docs/adr/0001.
   platformAutomerge: true,
   automergeStrategy: "squash",
-  // config:recommended caps PRs at 2 an hour; a weekly window needs all of them at once.
+  // config:recommended caps at 2 an hour; a weekly window needs them all.
   prHourlyLimit: 0,
 
   vulnerabilityAlerts: {
     enabled: true,
   },
 
-  // Which Pythons this project supports is a human decision, not a dependency.
+  // Python version support is a human decision, not a dependency.
   pyenv: {
     enabled: false,
   },
 
   pep621: {
-    // Raise the `>=` floors, don't just refresh the lock.
+    // Raise the `>=` floors, not just the lock.
     rangeStrategy: "bump",
     lockFileMaintenance: {
       enabled: true,
-      // Overrides lockFileMaintenance's own "before 4am on monday" default,
-      // which would otherwise shadow the repo-wide Sunday schedule.
+      // Its own default is monday, which would shadow the schedule above.
       schedule: ["before 9am on sunday"],
     },
   },
 
-  // Broad matchManagers rules first, specific matchDepNames last, so the
-  // lockstep groups win. Each of those four tools appears in two files: a
-  // split PR leaves one file updated and the other stale, and CI passes on
-  // the half it tests.
+  // Broad rules first, specific matchDepNames last, so the groups below win.
+  // Each grouped tool lives in two files; a split PR would update only one.
   packageRules: [
     {
       matchManagers: ["github-actions"],
@@ -54,16 +50,13 @@
       groupName: "python",
     },
     {
-      // setup-node's node-version is the interpreter the validator runs on,
-      // not a dependency: CI takes whatever is current LTS. Pinning it would
-      // mean tracking renovate's own engines.node by hand.
+      // Node is the interpreter, not a dependency: CI takes current LTS.
       matchManagers: ["github-actions"],
       matchDepNames: ["node"],
       enabled: false,
     },
     {
-      // pep621 extracts `requires-python` as a dependency. Which Pythons this
-      // project supports is a human decision, for the same reason pyenv is off.
+      // pep621 extracts `requires-python`; same decision as pyenv above.
       matchManagers: ["pep621"],
       matchDepTypes: ["requires-python"],
       enabled: false,
@@ -81,17 +74,13 @@
         "zizmorcore/zizmor",
         "zizmorcore/zizmor-action",
         "zizmorcore/zizmor-pre-commit",
-        // The github-actions manager reads the action's `version:` input as a
-        // container image as well, on top of the annotated env var.
+        // The action's `version:` input is also read as a container image.
         "ghcr.io/zizmorcore/zizmor",
       ],
       groupName: "zizmor",
     },
     {
-      // The pre-commit hook and the CI job's RENOVATE_VERSION validate against
-      // different schema versions if they drift: the hook passes locally and
-      // CI fails. No node here on purpose - CI takes whatever node is current
-      // LTS, as renovate's own hook does.
+      // Hook and CI must validate against the same schema version.
       matchDepNames: ["renovate", "renovatebot/pre-commit-hooks"],
       groupName: "renovate",
     },
