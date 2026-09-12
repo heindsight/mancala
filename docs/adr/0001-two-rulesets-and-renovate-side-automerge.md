@@ -6,8 +6,8 @@ instead of one:
 
 - **Review** — the `pull_request` rule. Its bypass list holds the repo-admin
   role and `renovate[bot]`, with `bypass_mode: pull_request`.
-- **Checks** — the required status checks, code scanning, code quality, code
-  coverage, and the `creation`, `deletion` and `non_fast_forward` rules. Its
+- **Checks** — the required status checks, code scanning (CodeQL only), code
+  quality, code coverage, and the `creation`, `deletion` and `non_fast_forward` rules. Its
   bypass list is empty.
 
 Renovate does the merging (`platformAutomerge: false`). It reads the check
@@ -32,6 +32,12 @@ faster, but it does not work with a review bypass. GitHub's auto-merge waits
 until every merge requirement is met. It does not use the bypass rights of the
 actor that turned it on. PR #19 showed this: every check passed, and the PR
 stayed blocked on the review requirement.
+
+**zizmor in the code scanning rule.** zizmor-action uploads its results
+against the PR's test merge commit. GitHub builds a new test merge commit when
+someone tries to merge, so the rule never found zizmor results and blocked
+every merge. Instead, the `zizmor` job runs with `advanced-security: false`.
+It then fails when zizmor finds a problem, and it is a required check.
 
 ## Consequences
 

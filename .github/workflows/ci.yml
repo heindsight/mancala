@@ -34,7 +34,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      security-events: write
     env:
       # renovate: datasource=github-tags depName=zizmorcore/zizmor
       ZIZMOR_VERSION: v1.24.1
@@ -45,6 +44,9 @@ jobs:
       - uses: zizmorcore/zizmor-action@192e21d79ab29983730a13d1382995c2307fbcaa  # v0.5.7
         with:
           version: ${{ env.ZIZMOR_VERSION }}
+          # Fail the job on findings. Uploaded results never satisfied the
+          # ruleset's code scanning rule, so this job is the gate instead.
+          advanced-security: false
 
   renovate-config-validator:
     name: renovate-config-validator
