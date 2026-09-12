@@ -13,8 +13,9 @@
   minimumReleaseAge: "3 days",
 
   automerge: true,
-  // Safe: the Checks ruleset has no bypass. See docs/adr/0001.
-  platformAutomerge: true,
+  // GitHub's auto-merge does not use the Review ruleset's bypass, so Renovate
+  // merges. The Checks ruleset has no bypass. See docs/adr/0001.
+  platformAutomerge: false,
   automergeStrategy: "squash",
   // config:recommended caps at 2 an hour; a weekly window needs them all.
   prHourlyLimit: 0,
