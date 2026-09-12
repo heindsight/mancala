@@ -39,7 +39,8 @@
   },
 
   // Broad rules first, specific matchDepNames last, so the groups below win.
-  // Each grouped tool lives in two files; a split PR would update only one.
+  // Each grouped tool is pinned in two or three files; a split PR would
+  // update some and leave the rest stale.
   packageRules: [
     {
       matchManagers: ["github-actions"],
