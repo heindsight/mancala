@@ -1,0 +1,89 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: [
+    "config:recommended",
+    // Beta manager, off by default.
+    ":enablePreCommit",
+    // Reads the `# renovate:` comments in ci.yml.
+    "customManagers:githubActionsVersions",
+    "helpers:pinGitHubActionDigests",
+  ],
+
+  schedule: ["before 9am on sunday"],
+  minimumReleaseAge: "3 days",
+
+  automerge: true,
+  // Safe: the Checks ruleset has no bypass. See docs/adr/0001.
+  platformAutomerge: true,
+  automergeStrategy: "squash",
+  // config:recommended caps at 2 an hour; a weekly window needs them all.
+  prHourlyLimit: 0,
+
+  vulnerabilityAlerts: {
+    enabled: true,
+  },
+
+  // Python version support is a human decision, not a dependency.
+  pyenv: {
+    enabled: false,
+  },
+
+  pep621: {
+    // Raise the `>=` floors, not just the lock.
+    rangeStrategy: "bump",
+    lockFileMaintenance: {
+      enabled: true,
+      // Its own default is monday, which would shadow the schedule above.
+      schedule: ["before 9am on sunday"],
+    },
+  },
+
+  // Broad rules first, specific matchDepNames last, so the groups below win.
+  // Each grouped tool is pinned in more than one file; a split PR would
+  // update some and leave the rest stale.
+  packageRules: [
+    {
+      matchManagers: ["github-actions"],
+      groupName: "github-actions",
+    },
+    {
+      matchManagers: ["pep621"],
+      groupName: "python",
+    },
+    {
+      // Node is the interpreter, not a dependency: CI takes current LTS.
+      matchManagers: ["github-actions"],
+      matchDepNames: ["node"],
+      enabled: false,
+    },
+    {
+      // pep621 extracts `requires-python`; same decision as pyenv above.
+      matchManagers: ["pep621"],
+      matchDepTypes: ["requires-python"],
+      enabled: false,
+    },
+    {
+      matchDepNames: ["ruff", "astral-sh/ruff-pre-commit"],
+      groupName: "ruff",
+    },
+    {
+      matchDepNames: ["uv_build", "astral-sh/uv-pre-commit", "astral-sh/setup-uv"],
+      groupName: "uv",
+    },
+    {
+      matchDepNames: [
+        "zizmorcore/zizmor",
+        "zizmorcore/zizmor-action",
+        "zizmorcore/zizmor-pre-commit",
+        // The action's `version:` input is also read as a container image.
+        "ghcr.io/zizmorcore/zizmor",
+      ],
+      groupName: "zizmor",
+    },
+    {
+      // Hook and CI must validate against the same schema version.
+      matchDepNames: ["renovate", "renovatebot/pre-commit-hooks"],
+      groupName: "renovate",
+    },
+  ],
+}

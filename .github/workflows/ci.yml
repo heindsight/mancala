@@ -35,10 +35,29 @@ jobs:
     permissions:
       contents: read
       security-events: write
+    env:
+      # renovate: datasource=github-tags depName=zizmorcore/zizmor
+      ZIZMOR_VERSION: v1.24.1
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           persist-credentials: false
       - uses: zizmorcore/zizmor-action@192e21d79ab29983730a13d1382995c2307fbcaa  # v0.5.7
         with:
-          version: v1.24.1
+          version: ${{ env.ZIZMOR_VERSION }}
+
+  renovate-config-validator:
+    name: renovate-config-validator
+    runs-on: ubuntu-latest
+    env:
+      # renovate: datasource=npm depName=renovate
+      RENOVATE_VERSION: 44.52.1
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
+      # Node is the interpreter, not a dependency; renovate's own hook says lts.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: "lts/*"
+      - run: npx --yes --package "renovate@$RENOVATE_VERSION" -- renovate-config-validator --strict
