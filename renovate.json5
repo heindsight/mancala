@@ -39,7 +39,7 @@
   },
 
   // Broad rules first, specific matchDepNames last, so the groups below win.
-  // Each grouped tool is pinned in two or three files; a split PR would
+  // Each grouped tool is pinned in more than one file; a split PR would
   // update some and leave the rest stale.
   packageRules: [
     {
