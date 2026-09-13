@@ -54,13 +54,36 @@ The trade-off is that a `NamedTuple` is a tuple. It compares equal to a plain
 tuple with the same values, and it can be unpacked. This was accepted, because
 it does no harm in a codebase this size.
 
+A transposition table keyed by the position alone is unsound for Oware. Two
+paths can reach the same position with different positions already seen, and
+the repetition rule can end one game but not the other. A table for Oware must
+include the positions already seen in its key, or not reuse results across
+paths.
+
+## Oware house rules
+
+Two Oware rules differ from standard play on purpose.
+
+- **A repeated position ends the game.** When a move produces a position that
+  the game has already reached, the game ends at once. Each player captures the
+  seeds left on their own side. Standard Abapa leaves an endless cycle for the
+  players to settle between them. This rule was chosen because it guarantees
+  that every game ends. Kalah needs no such rule: seeds only ever move towards
+  the stores, so a Kalah position cannot repeat.
+- **Every ending sweeps the board.** Standard play stops as soon as a store
+  holds more than 24 seeds, and leaves the seeds on the board uncounted. Here
+  the remaining seeds go to the store of the side they are on. This never
+  changes the winner. It keeps the engine's invariants the same for every
+  ending: a finished game has an empty board, and the stores always hold all 48
+  seeds.
+
 ## Toolchain
 
 | Tool | Choice | Reason |
 | --- | --- | --- |
 | Project management | uv, with a `src` layout | The modern standard toolchain. |
 | Lint and format | ruff | No reason was recorded. |
-| Type checking | ty, as strict as practical | The maintainer's preference. A small new codebase with plain modern typing is where ty is safest. |
+| Type checking | ty | The maintainer's preference. A small new codebase with plain modern typing is where ty is safest. |
 
 ty is in beta. If its rough edges cause problems, the fallback is mypy.
 
@@ -78,6 +101,12 @@ are tested from the start.
 - **Property tests** play random legal games and check invariants. Seeds are
   conserved. Every legal move is accepted. Events never refer to a cup that
   does not exist. A finished game has no legal move.
+- **Terminal interface tests** pass in their own input and output streams, and
+  assert what the player sees.
+
+The engine tests work only through inputs and outputs. The original design
+said the whole suite would use no mocks. That part is no longer live: the
+terminal interface tests mock some of the interface's own functions.
 
 ## No runtime dependencies
 

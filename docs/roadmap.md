@@ -9,8 +9,8 @@ implementation.
   animation. The first sketch was a FastAPI server with a thin JavaScript
   board. It waits for the engine / session / front-end split ([#4](https://github.com/heindsight/mancala/issues/4)), so that it
   does not have to duplicate what the engine knows.
-- **Network play.** Two people playing over a network: websockets, rooms, and
-  a server that holds the authoritative game state.
+- **Network play.** Two people playing from different machines: websockets,
+  rooms, and a server that holds the authoritative match.
 - **Further variants.** More members of the mancala family, such as Congkak
   and Bao.
 
