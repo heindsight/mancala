@@ -15,7 +15,7 @@ repos:
     hooks:
       - id: zizmor
   - repo: https://github.com/renovatebot/pre-commit-hooks
-    rev: be7264f90f01e89987ef141e9a763f186db1b565  # frozen: 44.76.0
+    rev: 01a3539fdb0f1620c24db179679eb1a8bcdaaf8b  # frozen: 44.78.0
     hooks:
       - id: renovate-config-validator
         args: [ --strict ]
