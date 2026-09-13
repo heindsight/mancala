@@ -1,7 +1,7 @@
 ---
 repos:
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: d9fca3320346514799461a80b0753eb45d707d46  # frozen: 0.11.28
+    rev: 729e1cac863cab7564738c1672fbc1d2d7c7a5c2  # frozen: 0.12.12
     hooks:
       - id: uv-lock
   - repo: https://github.com/astral-sh/ruff-pre-commit
