@@ -102,6 +102,7 @@ Variants are stateless rules objects:
 ```python
 class Rules(Protocol):
     name: str
+
     def initial_state(self, seeds_per_cup: int = 4) -> GameState: ...
     def legal_moves(self, state: GameState) -> tuple[Move, ...]: ...
     def apply_move(
