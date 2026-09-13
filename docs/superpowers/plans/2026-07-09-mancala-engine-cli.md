@@ -186,16 +186,23 @@ def test_opponent_is_the_other_player() -> None:
 
 
 def test_game_state_is_hashable_and_value_equal() -> None:
-    a = GameState(board=((4,) * 6, (4,) * 6), stores=(0, 0), current_player=Player.SOUTH)
-    b = GameState(board=((4,) * 6, (4,) * 6), stores=(0, 0), current_player=Player.SOUTH)
+    a = GameState(
+        board=((4,) * 6, (4,) * 6), stores=(0, 0), current_player=Player.SOUTH
+    )
+    b = GameState(
+        board=((4,) * 6, (4,) * 6), stores=(0, 0), current_player=Player.SOUTH
+    )
     assert a == b
     assert hash(a) == hash(b)
     assert a in {b}
 
 
 def test_board_is_indexed_by_player_value() -> None:
-    state = GameState(board=((1, 0, 0, 0, 0, 0), (0, 0, 0, 0, 0, 2)), stores=(3, 4),
-                      current_player=Player.NORTH)
+    state = GameState(
+        board=((1, 0, 0, 0, 0, 0), (0, 0, 0, 0, 0, 2)),
+        stores=(3, 4),
+        current_player=Player.NORTH,
+    )
     assert state.board[Player.SOUTH.value] == (1, 0, 0, 0, 0, 0)
     assert state.board[Player.NORTH.value] == (0, 0, 0, 0, 0, 2)
     assert state.stores[Player.NORTH.value] == 4
@@ -291,7 +298,9 @@ def test_events_are_immutable() -> None:
 
 
 def test_move_result_carries_state_and_events() -> None:
-    state = GameState(board=((0,) * 6, (0,) * 6), stores=(24, 24), current_player=Player.SOUTH)
+    state = GameState(
+        board=((0,) * 6, (0,) * 6), stores=(24, 24), current_player=Player.SOUTH
+    )
     result = MoveResult(state=state, events=(GameOver(None),))
     assert result.state is state
     assert result.events == (GameOver(None),)
@@ -639,11 +648,15 @@ def test_no_capture_when_opposite_cup_is_empty() -> None:
 
 
 def test_emptying_your_row_ends_the_game_and_sweeps() -> None:
-    state = make_state(south=(0, 0, 0, 0, 0, 1), north=(2, 0, 0, 0, 0, 3), stores=(20, 22))
+    state = make_state(
+        south=(0, 0, 0, 0, 0, 1), north=(2, 0, 0, 0, 0, 3), stores=(20, 22)
+    )
     result = KALAH.apply_move(state, 5)  # last seed lands in south's store
     assert result.state.board == ((0,) * 6, (0,) * 6)
     assert result.state.stores == (21, 27)
-    assert not any(isinstance(e, ExtraTurn) for e in result.events)  # game end trumps extra turn
+    assert not any(
+        isinstance(e, ExtraTurn) for e in result.events
+    )  # game end trumps extra turn
     assert result.events[-3:] == (
         Captured(by=Player.NORTH, owner=Player.NORTH, cup=0, seeds=2),
         Captured(by=Player.NORTH, owner=Player.NORTH, cup=5, seeds=3),
@@ -654,7 +667,9 @@ def test_emptying_your_row_ends_the_game_and_sweeps() -> None:
 
 
 def test_equal_stores_after_sweep_is_a_draw() -> None:
-    state = make_state(south=(0, 0, 0, 0, 0, 1), north=(0, 0, 0, 0, 0, 1), stores=(23, 23))
+    state = make_state(
+        south=(0, 0, 0, 0, 0, 1), north=(0, 0, 0, 0, 0, 1), stores=(23, 23)
+    )
     result = KALAH.apply_move(state, 5)
     assert result.state.stores == (24, 24)
     assert result.events[-1] == GameOver(None)
@@ -785,7 +800,11 @@ class Kalah:
             seeds -= 1
 
         opposite = CUPS - 1 - pos
-        if pos < CUPS and board[mover.value][pos] == 1 and board[opponent.value][opposite]:
+        if (
+            pos < CUPS
+            and board[mover.value][pos] == 1
+            and board[opponent.value][opposite]
+        ):
             for owner, cup in ((mover, pos), (opponent, opposite)):
                 taken = board[owner.value][cup]
                 stores[mover.value] += taken
@@ -1261,7 +1280,9 @@ from mancala.match import Match
 
 
 def test_capturing_more_than_half_the_seeds_ends_the_game() -> None:
-    state = make_state(south=(0, 0, 0, 0, 0, 1), north=(1, 1, 1, 1, 1, 1), stores=(23, 18))
+    state = make_state(
+        south=(0, 0, 0, 0, 0, 1), north=(1, 1, 1, 1, 1, 1), stores=(23, 18)
+    )
     result = OWARE.apply_move(state, 5)
     # South captures north cup 0 (now 2): store reaches 25 (> 24). Game over;
     # north's remaining 5 seeds are swept to north's store.
@@ -1276,7 +1297,9 @@ def test_unfeedable_starved_opponent_ends_the_game() -> None:
     # North moves its last seed into south's row; south then cannot feed the
     # now-empty north (cup 0: 4 seeds reach only cup 4; cup 1: 1 seed).
     state = make_state(
-        south=(3, 1, 0, 0, 0, 0), north=(0, 0, 0, 0, 0, 1), stores=(20, 23),
+        south=(3, 1, 0, 0, 0, 0),
+        north=(0, 0, 0, 0, 0, 1),
+        stores=(20, 23),
         player=Player.NORTH,
     )
     result = OWARE.apply_move(state, 5)
@@ -1288,7 +1311,9 @@ def test_unfeedable_starved_opponent_ends_the_game() -> None:
 def test_repeated_position_ends_the_game_with_a_split() -> None:
     # Two lone seeds chase each other around the board and return to the
     # exact starting position (same player to move) after 12 moves.
-    start = make_state(south=(0, 0, 0, 0, 0, 1), north=(0, 0, 0, 0, 0, 1), stores=(23, 23))
+    start = make_state(
+        south=(0, 0, 0, 0, 0, 1), north=(0, 0, 0, 0, 0, 1), stores=(23, 23)
+    )
     match = Match(OWARE, start)
     for move in [5, 5, 0, 0, 1, 1, 2, 2, 3, 3, 4]:
         match.play(move)
@@ -1337,11 +1362,12 @@ Replace `apply_move`'s final `return` with:
 And add the two protocol methods:
 
 ```python
-    def is_over(self, state: GameState) -> bool:
-        return board_empty(state)
+def is_over(self, state: GameState) -> bool:
+    return board_empty(state)
 
-    def winner(self, state: GameState) -> Player | None:
-        return winner_from_stores(state) if self.is_over(state) else None
+
+def winner(self, state: GameState) -> Player | None:
+    return winner_from_stores(state) if self.is_over(state) else None
 ```
 
 Note: `not self.legal_moves(candidate)` covers both starvation cases — the next player's row is empty, or their starved opponent cannot be fed. Starvation is resolved one ply early, inside the *previous* player's `apply_move`: the spec's "the mover keeps all remaining seeds" refers to the **next** player (the one facing the starved opponent), and since all remaining seeds sit on that player's side, sweeping each side to its owner awards them correctly.
@@ -1459,14 +1485,18 @@ from mancala.state import Player
 
 def test_scripted_kalah_endgame_plays_out_to_a_north_win() -> None:
     # Hand-verified script: south empties its row on the third move.
-    start = make_state(south=(0, 0, 0, 0, 1, 2), north=(1, 0, 0, 0, 0, 1), stores=(20, 23))
+    start = make_state(
+        south=(0, 0, 0, 0, 1, 2), north=(1, 0, 0, 0, 0, 1), stores=(20, 23)
+    )
     match = Match(variants.get("kalah"), start)
 
     match.play(4)  # south: 1 seed to cup 5 (now 3 seeds)
     assert match.state.board[Player.SOUTH.value] == (0, 0, 0, 0, 0, 3)
     assert not match.is_over
 
-    match.play(0)  # north: 1 seed to own empty cup 1; opposite south cup 4 is empty -> no capture
+    match.play(
+        0
+    )  # north: 1 seed to own empty cup 1; opposite south cup 4 is empty -> no capture
     assert match.state.board[Player.NORTH.value] == (0, 1, 0, 0, 0, 1)
     assert match.state.stores == (20, 23)
 
@@ -1523,7 +1553,9 @@ from mancala.state import Player
     seeds_per_cup=st.sampled_from([3, 4, 5, 6]),
     data=st.data(),
 )
-def test_random_playout_invariants(name: str, seeds_per_cup: int, data: st.DataObject) -> None:
+def test_random_playout_invariants(
+    name: str, seeds_per_cup: int, data: st.DataObject
+) -> None:
     rules = variants.get(name)
     if name != "kalah":
         seeds_per_cup = 4
@@ -1596,7 +1628,9 @@ NAMES = {Player.SOUTH: "Heinrich", Player.NORTH: "Nora"}
 
 
 def test_render_board_puts_the_current_player_on_the_bottom() -> None:
-    state = make_state(south=(4, 4, 4, 4, 4, 4), north=(4, 4, 4, 4, 4, 12), stores=(7, 0))
+    state = make_state(
+        south=(4, 4, 4, 4, 4, 4), north=(4, 4, 4, 4, 4, 12), stores=(7, 0)
+    )
     assert render_board(state, NAMES) == (
         "Nora (store: 0)\n"
         "    (6)   (5)   (4)   (3)   (2)   (1)\n"
@@ -1609,7 +1643,9 @@ def test_render_board_puts_the_current_player_on_the_bottom() -> None:
 
 def test_render_board_flips_for_the_other_player() -> None:
     state = make_state(
-        south=(1, 2, 3, 4, 5, 6), north=(0, 0, 0, 0, 0, 0), stores=(3, 9),
+        south=(1, 2, 3, 4, 5, 6),
+        north=(0, 0, 0, 0, 0, 0),
+        stores=(3, 9),
         player=Player.NORTH,
     )
     assert render_board(state, NAMES) == (
@@ -1707,7 +1743,9 @@ def describe_move(
                     f"{names[by]} captures {_seeds(seeds)} from {names[owner]}'s cup {cup + 1}."
                 )
             case Captured(by=by, cup=cup, seeds=seeds):
-                lines.append(f"{names[by]} collects {_seeds(seeds)} from cup {cup + 1}.")
+                lines.append(
+                    f"{names[by]} collects {_seeds(seeds)} from cup {cup + 1}."
+                )
             case ExtraTurn(player=player):
                 lines.append(f"{names[player]} gets an extra turn!")
             case GameOver():
@@ -1715,7 +1753,9 @@ def describe_move(
     return lines
 
 
-def describe_result(state: GameState, winner: Player | None, names: dict[Player, str]) -> str:
+def describe_result(
+    state: GameState, winner: Player | None, names: dict[Player, str]
+) -> str:
     south, north = state.stores
     if winner is None:
         return f"It's a draw, {south}-{north}."
@@ -1802,7 +1842,11 @@ def test_oware_rejects_nonstandard_seed_counts() -> None:
     import pytest
 
     with pytest.raises(SystemExit):
-        main(["--variant", "oware", "--seeds", "5"], stdin=io.StringIO(""), stdout=io.StringIO())
+        main(
+            ["--variant", "oware", "--seeds", "5"],
+            stdin=io.StringIO(""),
+            stdout=io.StringIO(),
+        )
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -1824,7 +1868,9 @@ def main(
 
     parser = argparse.ArgumentParser(prog="mancala", description="Hot-seat mancala.")
     parser.add_argument("--variant", choices=variants.available(), default="kalah")
-    parser.add_argument("--seeds", type=int, default=4, help="seeds per cup (kalah: 3-6)")
+    parser.add_argument(
+        "--seeds", type=int, default=4, help="seeds per cup (kalah: 3-6)"
+    )
     parser.add_argument("names", nargs="*", default=[], help="player names (up to two)")
     args = parser.parse_args(argv)
     if len(args.names) > 2:

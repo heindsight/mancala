@@ -16,6 +16,12 @@
   // Safe: the Checks ruleset has no bypass. See docs/adr/0001.
   platformAutomerge: true,
   automergeStrategy: "squash",
+  // The default (`auto`) rebases every PR that falls behind `main` once
+  // automerge is on, which resets its checks. Each merge then re-queued all
+  // the others and only one landed per Renovate run. The Checks ruleset does
+  // not require branches to be up to date, so falling behind is not a reason
+  // to rebase. See docs/adr/0001.
+  rebaseWhen: "conflicted",
   // config:recommended caps at 2 an hour; a weekly window needs them all.
   prHourlyLimit: 0,
 
