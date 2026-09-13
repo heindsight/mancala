@@ -40,6 +40,15 @@ It then fails when zizmor finds a problem, and it is a required check.
 
 ## Consequences
 
+Nothing requires a PR to be up to date with `main`: the required status checks
+rule is not strict. That is what makes a batch of Renovate PRs able to land
+together. Renovate's default `rebaseWhen` undid it — with automerge on it
+rebases any PR that falls behind `main`, so every merge reset the checks on
+every other open PR, and the batch drained one PR per Renovate run. The config
+sets `rebaseWhen: "conflicted"` instead, so a PR is rebased only when it
+actually conflicts. The cost is that a PR merges on checks that ran against an
+older `main`; the CI run on `main` after the merge is what catches that.
+
 A check blocks a bot merge only if it is on the Checks ruleset's required list:
 `checks (3.13)`, `checks (3.14)`, `zizmor`, and `renovate-config-validator`. A
 job that runs but is not required will not stop an automerge.
