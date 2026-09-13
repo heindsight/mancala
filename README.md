@@ -32,4 +32,5 @@ computer — either seat, or both:
     uv run ruff format .
     uv run ty check
 
-Design docs live in `docs/superpowers/specs/`.
+Decisions are recorded in `docs/adr/`. Planned work is listed in
+`docs/roadmap.md`.
