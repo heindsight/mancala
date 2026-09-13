@@ -3,11 +3,18 @@ from typing import NamedTuple
 from hypothesis import assume, given
 from hypothesis import strategies as st
 
-from mancala import variants
-from mancala.events import Captured, Event, ExtraTurn, GameOver, SeedSown, SeedStored
-from mancala.match import Match
-from mancala.rules import Move, MoveResult, Rules
-from mancala.state import GameState, Player
+from mancala.engine import variants
+from mancala.engine.events import (
+    Captured,
+    Event,
+    ExtraTurn,
+    GameOver,
+    SeedSown,
+    SeedStored,
+)
+from mancala.engine.match import Match
+from mancala.engine.rules import Move, MoveResult, Rules
+from mancala.engine.state import GameState, Player
 
 _VARIANTS = ("kalah", "oware")
 _MAX_PLIES = 2_000

@@ -1,8 +1,8 @@
 """Stateful wrapper around a Rules implementation for interactive play."""
 
-from mancala.events import Event
-from mancala.rules import IllegalMoveError, Move, MoveResult, Rules
-from mancala.state import GameState, Player
+from mancala.engine.events import Event
+from mancala.engine.rules import IllegalMoveError, Move, MoveResult, Rules
+from mancala.engine.state import GameState, Player
 
 
 class Match:

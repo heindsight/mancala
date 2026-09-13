@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from mancala.state import Player
+from mancala.engine.state import Player
 
 
 @dataclass(frozen=True, slots=True)

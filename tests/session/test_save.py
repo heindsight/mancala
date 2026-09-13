@@ -7,9 +7,10 @@ from typing import Any
 import pytest
 from helpers import make_state
 
-from mancala import save, variants
-from mancala.match import Match
-from mancala.state import Player
+from mancala.engine import variants
+from mancala.engine.match import Match
+from mancala.engine.state import Player
+from mancala.session import save
 
 NAMES = {Player.SOUTH: "Heinrich", Player.NORTH: "Nora"}
 

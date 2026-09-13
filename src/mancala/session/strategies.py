@@ -5,9 +5,9 @@ from collections.abc import Sequence
 from math import inf
 from typing import NamedTuple, Protocol
 
-from mancala.match import Match
-from mancala.rules import Move, Rules
-from mancala.state import GameState, Player
+from mancala.engine.match import Match
+from mancala.engine.rules import Move, Rules
+from mancala.engine.state import GameState, Player
 
 
 class Strategy(Protocol):

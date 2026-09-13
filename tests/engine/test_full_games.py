@@ -1,9 +1,9 @@
 from helpers import make_state
 
-from mancala import variants
-from mancala.events import Captured, GameOver, SeedSown, SeedStored
-from mancala.match import Match
-from mancala.state import Player
+from mancala.engine import variants
+from mancala.engine.events import Captured, GameOver, SeedSown, SeedStored
+from mancala.engine.match import Match
+from mancala.engine.state import Player
 
 
 def test_scripted_kalah_endgame_plays_out_to_a_north_win() -> None:

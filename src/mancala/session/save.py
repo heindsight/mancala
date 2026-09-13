@@ -15,10 +15,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
-from mancala import variants
-from mancala.match import Match
-from mancala.rules import IllegalMoveError
-from mancala.state import GameState, Player
+from mancala.engine import variants
+from mancala.engine.match import Match
+from mancala.engine.rules import IllegalMoveError
+from mancala.engine.state import GameState, Player
 
 FORMAT = "mancala-save"
 VERSION = 1

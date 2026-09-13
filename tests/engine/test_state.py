@@ -1,4 +1,4 @@
-from mancala.state import GameState, Player
+from mancala.engine.state import GameState, Player
 
 
 def test_opponent_is_the_other_player() -> None:

@@ -3,8 +3,8 @@
 from collections.abc import Container
 from typing import NamedTuple, Protocol
 
-from mancala.events import Event
-from mancala.state import GameState, Player
+from mancala.engine.events import Event
+from mancala.engine.state import GameState, Player
 
 type Move = int
 """A move is a 0-based cup index from the mover's own perspective."""

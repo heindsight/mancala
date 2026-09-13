@@ -2,8 +2,8 @@ import dataclasses
 
 import pytest
 
-from mancala.events import ExtraTurn, GameOver, SeedSown, SeedStored
-from mancala.state import Player
+from mancala.engine.events import ExtraTurn, GameOver, SeedSown, SeedStored
+from mancala.engine.state import Player
 
 
 def test_same_shaped_events_of_different_types_are_not_equal() -> None:
