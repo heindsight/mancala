@@ -1,10 +1,10 @@
 import pytest
 from helpers import make_state
 
-from mancala.events import Captured, GameOver, SeedSown
-from mancala.match import Match
-from mancala.state import Player
-from mancala.variants.oware import Oware
+from mancala.engine.events import Captured, GameOver, SeedSown
+from mancala.engine.match import Match
+from mancala.engine.state import Player
+from mancala.engine.variants.oware import Oware
 
 OWARE = Oware()
 

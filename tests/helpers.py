@@ -3,9 +3,9 @@
 from hypothesis import assume
 from hypothesis import strategies as st
 
-from mancala import variants
-from mancala.match import Match
-from mancala.state import GameState, Player
+from mancala.engine import variants
+from mancala.engine.match import Match
+from mancala.engine.state import GameState, Player
 
 
 def make_state(

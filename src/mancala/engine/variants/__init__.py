@@ -1,9 +1,9 @@
 """Game variant implementations and their registry."""
 
-from mancala.rules import Rules
-from mancala.variants._common import CUPS as CUPS
-from mancala.variants.kalah import Kalah
-from mancala.variants.oware import Oware
+from mancala.engine.rules import Rules
+from mancala.engine.variants._common import CUPS as CUPS
+from mancala.engine.variants.kalah import Kalah
+from mancala.engine.variants.oware import Oware
 
 _REGISTRY: dict[str, Rules] = {rules.name: rules for rules in (Kalah(), Oware())}
 

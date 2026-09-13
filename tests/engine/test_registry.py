@@ -1,8 +1,8 @@
 import pytest
 
-from mancala import variants
-from mancala.variants.kalah import Kalah
-from mancala.variants.oware import Oware
+from mancala.engine import variants
+from mancala.engine.variants.kalah import Kalah
+from mancala.engine.variants.oware import Oware
 
 
 def test_available_lists_both_variants_sorted() -> None:

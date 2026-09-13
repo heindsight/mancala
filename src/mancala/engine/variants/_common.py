@@ -1,7 +1,7 @@
 """Helpers shared by variant implementations (internal)."""
 
-from mancala.events import Captured, Event
-from mancala.state import GameState, Player
+from mancala.engine.events import Captured, Event
+from mancala.engine.state import GameState, Player
 
 CUPS = 6
 

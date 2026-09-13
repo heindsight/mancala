@@ -9,7 +9,7 @@ requires-python = ">=3.13"
 dependencies = []
 
 [project.scripts]
-mancala = "mancala.cli:main"
+mancala = "mancala.cli.main:main"
 
 [tool.ruff]
 line-length = 88

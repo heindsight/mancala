@@ -1,9 +1,9 @@
 import pytest
 from helpers import make_state
 
-from mancala.events import Captured, ExtraTurn, GameOver, SeedSown, SeedStored
-from mancala.state import Player
-from mancala.variants.kalah import Kalah
+from mancala.engine.events import Captured, ExtraTurn, GameOver, SeedSown, SeedStored
+from mancala.engine.state import Player
+from mancala.engine.variants.kalah import Kalah
 
 KALAH = Kalah()
 

@@ -3,11 +3,11 @@ import re
 import pytest
 from helpers import make_state
 
-from mancala.events import SeedSown
-from mancala.match import Match
-from mancala.rules import IllegalMoveError
-from mancala.state import Player
-from mancala.variants.kalah import Kalah
+from mancala.engine.events import SeedSown
+from mancala.engine.match import Match
+from mancala.engine.rules import IllegalMoveError
+from mancala.engine.state import Player
+from mancala.engine.variants.kalah import Kalah
 
 KALAH = Kalah()
 

@@ -4,12 +4,12 @@ import pytest
 from helpers import make_state, matches
 from hypothesis import given
 
-from mancala import strategies
-from mancala.match import Match
-from mancala.rules import Move, Rules
-from mancala.state import GameState, Player
-from mancala.strategies import GreedyStrategy, MinimaxStrategy, RandomStrategy
-from mancala.variants.kalah import Kalah
+from mancala.engine.match import Match
+from mancala.engine.rules import Move, Rules
+from mancala.engine.state import GameState, Player
+from mancala.engine.variants.kalah import Kalah
+from mancala.session import strategies
+from mancala.session.strategies import GreedyStrategy, MinimaxStrategy, RandomStrategy
 
 KALAH = Kalah()
 

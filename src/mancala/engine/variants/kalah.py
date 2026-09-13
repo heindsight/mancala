@@ -2,10 +2,17 @@
 
 from collections.abc import Container
 
-from mancala.events import Captured, Event, ExtraTurn, GameOver, SeedSown, SeedStored
-from mancala.rules import Move, MoveResult
-from mancala.state import GameState, Player
-from mancala.variants._common import (
+from mancala.engine.events import (
+    Captured,
+    Event,
+    ExtraTurn,
+    GameOver,
+    SeedSown,
+    SeedStored,
+)
+from mancala.engine.rules import Move, MoveResult
+from mancala.engine.state import GameState, Player
+from mancala.engine.variants._common import (
     CUPS,
     board_empty,
     frozen,
