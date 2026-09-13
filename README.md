@@ -33,5 +33,4 @@ computer — either seat, or both:
     uv run ty check
 
 Decisions are recorded in `docs/adr/`. Planned work is listed in
-`docs/roadmap.md`. Specs and plans for work in progress are in `docs/specs/`
-and `docs/plans/`.
+`docs/roadmap.md`.
