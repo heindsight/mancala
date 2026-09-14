@@ -1,6 +1,9 @@
 """Kalah: the classic store-and-capture mancala variant."""
 
 from collections.abc import Container
+from typing import Annotated
+
+from pydantic import BaseModel, ConfigDict, Field
 
 from mancala.engine.events import (
     Captured,
@@ -19,6 +22,7 @@ from mancala.engine.variants._common import (
     sweep_remaining,
     winner_from_stores,
 )
+from mancala.engine.variants.descriptor import VariantDescriptor
 
 _CUPS = 6
 
@@ -28,14 +32,32 @@ _CYCLE = 2 * _CUPS + 1
 _STORE = _CUPS
 
 
-class Kalah:
-    name = "kalah"
-    SEED_COUNTS = range(3, 7)
+class KalahConfig(BaseModel):
+    """Settings for one game of Kalah."""
 
-    def initial_state(self, seeds_per_cup: int = 4) -> GameState:
-        if seeds_per_cup not in self.SEED_COUNTS:
-            raise ValueError("kalah supports 3-6 seeds per cup")
-        row = (seeds_per_cup,) * _CUPS
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    seeds_per_cup: Annotated[
+        int,
+        Field(
+            ge=3,
+            le=6,
+            title="Seeds per cup",
+            description="How many seeds each cup holds when the game starts.",
+        ),
+    ] = 4
+
+
+class Kalah:
+    def __init__(self, config: KalahConfig) -> None:
+        self._config = config
+
+    @property
+    def config(self) -> KalahConfig:
+        return self._config
+
+    def initial_state(self) -> GameState:
+        row = (self._config.seeds_per_cup,) * _CUPS
         return GameState(board=(row, row), stores=(0, 0), current_player=Player.SOUTH)
 
     def legal_moves(self, state: GameState) -> tuple[Move, ...]:
@@ -99,3 +121,8 @@ class Kalah:
 
     def winner(self, state: GameState) -> Player | None:
         return winner_from_stores(state) if self.is_over(state) else None
+
+
+DESCRIPTOR = VariantDescriptor(
+    id="kalah", display_name="Kalah", config_model=KalahConfig, factory=Kalah
+)

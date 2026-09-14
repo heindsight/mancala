@@ -22,8 +22,8 @@ def matches(
     draw: st.DrawFn, names: tuple[str, ...] = ("kalah", "oware"), plies: int = 10
 ) -> Match:
     """A match still in play, advanced from the opening by up to `plies` legal moves."""
-    rules = variants.get(draw(st.sampled_from(names)))
-    match = Match(rules, rules.initial_state())
+    rules = variants.get(draw(st.sampled_from(names))).create()
+    match = Match(rules)
     target = draw(st.integers(min_value=0, max_value=plies))
     while len(match.history) < target and not match.is_over:
         match.play(draw(st.sampled_from(rules.legal_moves(match.state))))

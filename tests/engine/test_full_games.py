@@ -11,7 +11,7 @@ def test_scripted_kalah_endgame_plays_out_to_a_north_win() -> None:
     start = make_state(
         south=(0, 0, 0, 0, 1, 2), north=(1, 0, 0, 0, 0, 1), stores=(20, 23)
     )
-    match = Match(variants.get("kalah"), start)
+    match = Match(variants.get("kalah").create(), start)
 
     match.play(4)  # south: 1 seed to cup 5 (now 3 seeds)
     assert match.state.board[Player.SOUTH.value] == (0, 0, 0, 0, 0, 3)
@@ -42,7 +42,7 @@ def test_scripted_kalah_endgame_plays_out_to_a_north_win() -> None:
 
 
 def first_legal_playout(name: str) -> Match:
-    match = Match(variants.get(name))
+    match = Match(variants.get(name).create())
     plies = 0
     while not match.is_over:
         match.play(match.rules.legal_moves(match.state)[0])

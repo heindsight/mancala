@@ -7,9 +7,9 @@ from mancala.engine.events import SeedSown
 from mancala.engine.match import Match
 from mancala.engine.rules import IllegalMoveError
 from mancala.engine.state import Player
-from mancala.engine.variants.kalah import Kalah
+from mancala.engine.variants.kalah import Kalah, KalahConfig
 
-KALAH = Kalah()
+KALAH = Kalah(KalahConfig())
 
 
 def test_match_starts_from_the_initial_state_by_default() -> None:

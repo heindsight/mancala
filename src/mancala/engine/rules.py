@@ -3,6 +3,8 @@
 from collections.abc import Container
 from typing import NamedTuple, Protocol
 
+from pydantic import BaseModel
+
 from mancala.engine.events import Event
 from mancala.engine.state import GameState, Player
 
@@ -20,19 +22,23 @@ class IllegalMoveError(Exception):
 
 
 class Rules(Protocol):
-    """A stateless mancala variant.
+    """The mechanics of one mancala variant, configured for one game.
 
-    `apply_move` assumes the move is legal (validate via `Match`) and returns a
-    fully resolved state: sowing, captures, turn passing, and the end-of-game
-    sweep if the move ended the game. `history` holds the states already seen
-    this game; variants with repetition rules (Oware) consult it, others
-    ignore it. Terminal states have every cup empty, so `is_over` and
+    A variant is constructed with its config and holds nothing about the game
+    in progress. `apply_move` assumes the move is legal (validate via `Match`)
+    and returns a fully resolved state: sowing, captures, turn passing, and the
+    end-of-game sweep if the move ended the game. `history` holds the states
+    already seen this game; variants with repetition rules (Oware) consult it,
+    others ignore it. Terminal states have every cup empty, so `is_over` and
     `winner` are pure functions of a single state.
     """
 
-    name: str
+    # A property, not an attribute: a protocol attribute is invariant, so
+    # `config: BaseModel` could not be satisfied by a variant's own config type.
+    @property
+    def config(self) -> BaseModel: ...
 
-    def initial_state(self, seeds_per_cup: int = 4) -> GameState: ...
+    def initial_state(self) -> GameState: ...
 
     def legal_moves(self, state: GameState) -> tuple[Move, ...]: ...
 

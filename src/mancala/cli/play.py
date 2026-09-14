@@ -7,6 +7,7 @@ from mancala.cli.render import describe_move, describe_result, render_board
 from mancala.engine.match import Match
 from mancala.engine.rules import IllegalMoveError, Move
 from mancala.engine.state import Player
+from mancala.engine.variants.descriptor import VariantDescriptor
 from mancala.session import save
 from mancala.session.strategies import Strategy
 
@@ -60,11 +61,15 @@ class ComputerPlayer:
 
 
 def play_match(
-    match: Match, players: tuple[TerminalPlayer, TerminalPlayer], stdout: TextIO
+    variant: VariantDescriptor,
+    match: Match,
+    players: tuple[TerminalPlayer, TerminalPlayer],
+    stdout: TextIO,
 ) -> int:
     """Run the interactive loop: 0 when the game is played out, 1 when abandoned.
 
-    `players` is indexed by `Player.value`, so south moves first.
+    `match` is a game of `variant`, which a save records. `players` is indexed
+    by `Player.value`, so south moves first.
     """
     names = {side: players[side.value].name for side in Player}
     while not match.is_over:
@@ -79,7 +84,7 @@ def play_match(
         if isinstance(move, SaveGame):
             specs = {side: players[side.value].spec for side in Player}
             try:
-                save.dump(match, specs, move.file)
+                save.dump(variant, match, specs, move.file)
             except (OSError, save.SaveError) as error:
                 print(f"Could not save: {error}.", file=stdout)
                 continue

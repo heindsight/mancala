@@ -1,20 +1,22 @@
 """Game variant implementations and their registry."""
 
-from mancala.engine.rules import Rules
-from mancala.engine.variants.kalah import Kalah
-from mancala.engine.variants.oware import Oware
+from mancala.engine.variants import kalah, oware
+from mancala.engine.variants.descriptor import VariantDescriptor
 
-_REGISTRY: dict[str, Rules] = {rules.name: rules for rules in (Kalah(), Oware())}
+_REGISTRY: dict[str, VariantDescriptor] = {
+    descriptor.id: descriptor for descriptor in (kalah.DESCRIPTOR, oware.DESCRIPTOR)
+}
 
 
-def get(name: str) -> Rules:
+def get(variant_id: str) -> VariantDescriptor:
     try:
-        return _REGISTRY[name]
+        return _REGISTRY[variant_id]
     except KeyError:
         raise ValueError(
-            f"unknown variant {name!r}; available: {', '.join(available())}"
+            f"unknown variant {variant_id!r}; available: {', '.join(sorted(_REGISTRY))}"
         ) from None
 
 
-def available() -> tuple[str, ...]:
-    return tuple(sorted(_REGISTRY))
+def available() -> tuple[VariantDescriptor, ...]:
+    """Every variant's descriptor, ordered by identifier."""
+    return tuple(_REGISTRY[variant_id] for variant_id in sorted(_REGISTRY))

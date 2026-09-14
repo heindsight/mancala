@@ -110,6 +110,8 @@ terminal interface tests mock some of the interface's own functions.
 
 ## No runtime dependencies
 
+Superseded by ADR 0002, which takes pydantic as a runtime dependency.
+
 The project has no runtime dependencies. The standard library's `argparse` is
 enough for the terminal interface.
 

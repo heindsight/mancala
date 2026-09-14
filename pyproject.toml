@@ -6,7 +6,9 @@ readme = "README.md"
 license = "BSD-2-Clause"
 license-files = ["LICENSE"]
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "pydantic>=2.13.5",
+]
 
 [project.scripts]
 mancala = "mancala.cli.main:main"

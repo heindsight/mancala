@@ -1,13 +1,13 @@
 """Save and resume games as JSON documents.
 
-A save document records metadata (variant, seed count, player specs, save
-time), the move history, and the current state. A player spec is a name for a
-human seat or `cpu:<difficulty>` for a computer one, so a resumed game seats
-the same players. Loading replays the history
-from the variant's initial position, which rebuilds everything a `Match`
-tracks — including the set of seen states that Oware's repetition rule
-needs — and validates the document in full: every recorded move must be
-legal in sequence, and the recorded state must match the replayed one.
+A save document records metadata (variant, its validated config, player
+specs, save time), the move history, and the current state. A player spec is
+a name for a human seat or `cpu:<difficulty>` for a computer one, so a resumed
+game seats the same players. Loading replays the history from the variant's
+initial position, which rebuilds everything a `Match` tracks — including the
+set of seen states that Oware's repetition rule needs — and validates the
+document in full: every recorded move must be legal in sequence, and the
+recorded state must match the replayed one.
 """
 
 import json
@@ -19,6 +19,7 @@ from mancala.engine import variants
 from mancala.engine.match import Match
 from mancala.engine.rules import IllegalMoveError
 from mancala.engine.state import GameState, Player
+from mancala.engine.variants.descriptor import VariantDescriptor
 
 FORMAT = "mancala-save"
 VERSION = 1
@@ -28,13 +29,18 @@ class SaveError(Exception):
     """The save document is malformed, inconsistent, or unwritable."""
 
 
-def dump(match: Match, specs: dict[Player, str], file: str | Path) -> None:
-    """Write `match` to `file`. Raises SaveError or OSError on failure."""
-    document = to_document(match, specs)
+def dump(
+    variant: VariantDescriptor,
+    match: Match,
+    specs: dict[Player, str],
+    file: str | Path,
+) -> None:
+    """Write `match` of `variant` to `file`. Raises SaveError or OSError on failure."""
+    document = to_document(variant, match, specs)
     Path(file).write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
 
 
-def load(file: str | Path) -> tuple[Match, dict[Player, str]]:
+def load(file: str | Path) -> tuple[VariantDescriptor, Match, dict[Player, str]]:
     """Read a match from `file`. Raises SaveError or OSError on failure."""
     text = Path(file).read_text(encoding="utf-8")
     try:
@@ -44,22 +50,19 @@ def load(file: str | Path) -> tuple[Match, dict[Player, str]]:
     return from_document(document)
 
 
-def to_document(match: Match, specs: dict[Player, str]) -> dict[str, object]:
-    """Serialize `match` to a JSON-compatible document."""
+def to_document(
+    variant: VariantDescriptor, match: Match, specs: dict[Player, str]
+) -> dict[str, object]:
+    """Serialize `match` of `variant` to a JSON-compatible document."""
     initial = match.history[0][0] if match.history else match.state
-    seeds = initial.board[0][0]
-    try:
-        expected = match.rules.initial_state(seeds)
-    except ValueError:
-        expected = None
-    if initial != expected:
+    if initial != match.rules.initial_state():
         raise SaveError("only games started from an initial position can be saved")
     return {
         "format": FORMAT,
         "version": VERSION,
         "metadata": {
-            "variant": match.rules.name,
-            "seeds_per_cup": seeds,
+            "variant": variant.id,
+            "config": match.rules.config.model_dump(mode="json"),
             "players": {p.name.lower(): specs[p] for p in Player},
             "saved_at": datetime.now(UTC).isoformat(),
         },
@@ -68,8 +71,10 @@ def to_document(match: Match, specs: dict[Player, str]) -> dict[str, object]:
     }
 
 
-def from_document(document: object) -> tuple[Match, dict[Player, str]]:
-    """Rebuild the match and player specs from a save document.
+def from_document(
+    document: object,
+) -> tuple[VariantDescriptor, Match, dict[Player, str]]:
+    """Rebuild the variant, match and player specs from a save document.
 
     Raises SaveError unless the document is well-formed, every move in its
     history replays legally, and the recorded state matches the replayed one.
@@ -83,17 +88,17 @@ def from_document(document: object) -> tuple[Match, dict[Player, str]]:
     _string(metadata.get("saved_at"), "saved_at")
     players = _mapping(metadata.get("players"), "players")
     specs = {p: _string(players.get(p.name.lower()), p.name.lower()) for p in Player}
+    variant_id = _string(metadata.get("variant"), "variant")
+    config = _mapping(metadata.get("config"), "config")
     try:
-        rules = variants.get(_string(metadata.get("variant"), "variant"))
-        initial = rules.initial_state(
-            _integer(metadata.get("seeds_per_cup"), "seeds_per_cup")
-        )
+        variant = variants.get(variant_id)
+        rules = variant.create(config)
     except ValueError as error:
         raise SaveError(str(error)) from error
     history = doc.get("history")
     if not isinstance(history, list):
         raise SaveError("history must be a list of moves")
-    match = Match(rules, initial)
+    match = Match(rules)
     for number, move in enumerate(history, start=1):
         try:
             match.play(_integer(move, f"history move {number}"))
@@ -103,7 +108,7 @@ def from_document(document: object) -> tuple[Match, dict[Player, str]]:
             ) from error
     if doc.get("state") != _state_document(match.state):
         raise SaveError("recorded state does not match the state replayed from history")
-    return match, specs
+    return variant, match, specs
 
 
 def _state_document(state: GameState) -> dict[str, object]:

@@ -4,9 +4,9 @@ from helpers import make_state
 from mancala.engine.events import Captured, GameOver, SeedSown
 from mancala.engine.match import Match
 from mancala.engine.state import Player
-from mancala.engine.variants.oware import Oware
+from mancala.engine.variants.oware import Oware, OwareConfig
 
-OWARE = Oware()
+OWARE = Oware(OwareConfig())
 
 
 def test_initial_state_is_six_cups_of_four() -> None:
@@ -14,12 +14,6 @@ def test_initial_state_is_six_cups_of_four() -> None:
     assert state.board == ((4,) * 6, (4,) * 6)
     assert state.stores == (0, 0)
     assert state.current_player is Player.SOUTH
-
-
-@pytest.mark.parametrize("seeds", [0, 3, 5, 6, -1, 100])
-def test_initial_state_rejects_anything_but_four_seeds(seeds: int) -> None:
-    with pytest.raises(ValueError, match="4 seeds"):
-        OWARE.initial_state(seeds_per_cup=seeds)
 
 
 def test_legal_moves_are_the_movers_nonempty_cups() -> None:

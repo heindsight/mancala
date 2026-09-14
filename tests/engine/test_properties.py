@@ -40,8 +40,10 @@ class PlayedMove(NamedTuple):
 def playouts(draw: st.DrawFn, names: tuple[str, ...] = _VARIANTS) -> Playout:
     name = draw(st.sampled_from(names))
     seeds = draw(st.integers(min_value=3, max_value=6)) if name == "kalah" else 4
-    rules = variants.get(name)
-    match = Match(rules, rules.initial_state(seeds))
+    rules = variants.get(name).create(
+        {"seeds_per_cup": seeds} if name == "kalah" else {}
+    )
+    match = Match(rules)
     while not match.is_over and len(match.history) < _MAX_PLIES:
         match.play(draw(st.sampled_from(rules.legal_moves(match.state))))
     return Playout(match, total=2 * 6 * seeds)

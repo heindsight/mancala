@@ -11,10 +11,11 @@ from mancala.cli.play import ComputerPlayer, HumanPlayer
 from mancala.engine import variants
 from mancala.engine.match import Match
 from mancala.engine.state import Player
-from mancala.engine.variants.kalah import Kalah
+from mancala.engine.variants.kalah import Kalah, KalahConfig
+from mancala.engine.variants.oware import Oware
 from mancala.session import save
 
-KALAH = Kalah()
+KALAH = Kalah(KalahConfig())
 NAMES = {Player.SOUTH: "Heinrich", Player.NORTH: "Nora"}
 
 
@@ -25,19 +26,22 @@ def mock_play_match(mocker: MockerFixture) -> MagicMock:
 
 def test_main_plays_the_requested_variant(mock_play_match: MagicMock) -> None:
     main(["new", "--variant", "oware"])
-    assert mock_play_match.call_args.args[0].rules is variants.get("oware")
+    variant, match, _, _ = mock_play_match.call_args.args
+    assert variant.id == "oware"
+    assert isinstance(match.rules, Oware)
 
 
 def test_main_builds_the_initial_board_with_the_requested_seeds(
     mock_play_match: MagicMock,
 ) -> None:
     main(["new", "--seeds", "3"])
-    assert mock_play_match.call_args.args[0].state == KALAH.initial_state(3)
+    expected = Kalah(KalahConfig(seeds_per_cup=3)).initial_state()
+    assert mock_play_match.call_args.args[1].state == expected
 
 
 def test_main_assigns_the_player_names(mock_play_match: MagicMock) -> None:
     main(["new", "Ana", "Ben"])
-    assert [player.name for player in mock_play_match.call_args.args[1]] == [
+    assert [player.name for player in mock_play_match.call_args.args[2]] == [
         "Ana",
         "Ben",
     ]
@@ -45,7 +49,7 @@ def test_main_assigns_the_player_names(mock_play_match: MagicMock) -> None:
 
 def test_main_defaults_the_player_names(mock_play_match: MagicMock) -> None:
     main(["new"])
-    assert [player.name for player in mock_play_match.call_args.args[1]] == [
+    assert [player.name for player in mock_play_match.call_args.args[2]] == [
         "Player 1",
         "Player 2",
     ]
@@ -53,28 +57,28 @@ def test_main_defaults_the_player_names(mock_play_match: MagicMock) -> None:
 
 def test_main_seats_two_humans_for_hot_seat_play(mock_play_match: MagicMock) -> None:
     main(["new"])
-    south, north = mock_play_match.call_args.args[1]
+    south, north = mock_play_match.call_args.args[2]
     assert isinstance(south, HumanPlayer)
     assert isinstance(north, HumanPlayer)
 
 
 def test_main_puts_a_computer_on_north(mock_play_match: MagicMock) -> None:
     main(["new", "Ana", "cpu:easy"])
-    south, north = mock_play_match.call_args.args[1]
+    south, north = mock_play_match.call_args.args[2]
     assert isinstance(south, HumanPlayer)
     assert isinstance(north, ComputerPlayer)
 
 
 def test_main_puts_a_computer_on_south(mock_play_match: MagicMock) -> None:
     main(["new", "cpu:easy", "Ben"])
-    south, north = mock_play_match.call_args.args[1]
+    south, north = mock_play_match.call_args.args[2]
     assert isinstance(south, ComputerPlayer)
     assert isinstance(north, HumanPlayer)
 
 
 def test_main_seats_two_computers(mock_play_match: MagicMock) -> None:
     main(["new", "cpu:easy", "cpu:hard"])
-    south, north = mock_play_match.call_args.args[1]
+    south, north = mock_play_match.call_args.args[2]
     assert isinstance(south, ComputerPlayer)
     assert isinstance(north, ComputerPlayer)
 
@@ -92,13 +96,13 @@ def test_main_names_the_computer_after_its_difficulty(
     mock_play_match: MagicMock,
 ) -> None:
     main(["new", "Ana", "cpu:medium"])
-    _, north = mock_play_match.call_args.args[1]
+    _, north = mock_play_match.call_args.args[2]
     assert north.name == "Computer (medium)"
 
 
 def test_main_treats_a_bare_cpu_as_a_human_name(mock_play_match: MagicMock) -> None:
     main(["new", "cpu", "Ben"])
-    south, _ = mock_play_match.call_args.args[1]
+    south, _ = mock_play_match.call_args.args[2]
     assert isinstance(south, HumanPlayer)
     assert south.name == "cpu"
 
@@ -124,14 +128,14 @@ def test_main_passes_the_output_stream_to_the_match_loop(
 ) -> None:
     stdout = io.StringIO()
     main(["new"], stdin=io.StringIO(), stdout=stdout)
-    assert mock_play_match.call_args.args[2] is stdout
+    assert mock_play_match.call_args.args[3] is stdout
 
 
 def test_main_gives_the_human_players_the_supplied_input_stream(
     mock_play_match: MagicMock,
 ) -> None:
     main(["new"], stdin=io.StringIO("3\n"), stdout=io.StringIO())
-    match, (south, _), _ = mock_play_match.call_args.args
+    _, match, (south, _), _ = mock_play_match.call_args.args
     assert south.get_move(match) == 2
 
 
@@ -139,7 +143,7 @@ def test_main_defaults_to_the_process_output_stream(
     mock_play_match: MagicMock,
 ) -> None:
     main(["new"])
-    assert mock_play_match.call_args.args[2] is sys.stdout
+    assert mock_play_match.call_args.args[3] is sys.stdout
 
 
 def test_main_defaults_to_the_process_input_stream(
@@ -147,7 +151,7 @@ def test_main_defaults_to_the_process_input_stream(
 ) -> None:
     mocker.patch.object(sys, "stdin", io.StringIO("3\n"))
     main(["new"])
-    match, (south, _), _ = mock_play_match.call_args.args
+    _, match, (south, _), _ = mock_play_match.call_args.args
     assert south.get_move(match) == 2
 
 
@@ -164,14 +168,16 @@ def test_main_requires_a_subcommand(capsys: pytest.CaptureFixture[str]) -> None:
 
 
 def test_main_resumes_a_saved_game(mock_play_match: MagicMock, tmp_path: Path) -> None:
-    original = Match(variants.get("oware"))
+    oware = variants.get("oware")
+    original = Match(oware.create())
     original.play(2)
     original.play(4)
     file = tmp_path / "game.json"
-    save.dump(original, NAMES, file)
+    save.dump(oware, original, NAMES, file)
     main(["resume", str(file)])
-    restored = mock_play_match.call_args.args[0]
-    assert restored.rules is original.rules
+    variant, restored, _, _ = mock_play_match.call_args.args
+    assert variant.id == "oware"
+    assert isinstance(restored.rules, Oware)
     assert restored.state == original.state
     assert restored.history == original.history
 
@@ -180,9 +186,9 @@ def test_main_resumes_the_saved_player_names(
     mock_play_match: MagicMock, tmp_path: Path
 ) -> None:
     file = tmp_path / "game.json"
-    save.dump(Match(KALAH), NAMES, file)
+    save.dump(variants.get("kalah"), Match(KALAH), NAMES, file)
     main(["resume", str(file)])
-    assert [player.name for player in mock_play_match.call_args.args[1]] == [
+    assert [player.name for player in mock_play_match.call_args.args[2]] == [
         "Heinrich",
         "Nora",
     ]
@@ -192,9 +198,10 @@ def test_main_resumes_a_computer_player(
     mock_play_match: MagicMock, tmp_path: Path
 ) -> None:
     file = tmp_path / "game.json"
-    save.dump(Match(KALAH), {Player.SOUTH: "cpu:hard", Player.NORTH: "Nora"}, file)
+    specs = {Player.SOUTH: "cpu:hard", Player.NORTH: "Nora"}
+    save.dump(variants.get("kalah"), Match(KALAH), specs, file)
     main(["resume", str(file)])
-    south, north = mock_play_match.call_args.args[1]
+    south, north = mock_play_match.call_args.args[2]
     assert isinstance(south, ComputerPlayer)
     assert south.name == "Computer (hard)"
     assert isinstance(north, HumanPlayer)
@@ -227,13 +234,15 @@ def test_resume_requires_a_file(capsys: pytest.CaptureFixture[str]) -> None:
     assert "arguments are required: file" in capsys.readouterr().err
 
 
-def test_oware_rejects_nonstandard_seed_counts(
+def test_oware_refuses_a_seed_count_rather_than_ignoring_it(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     with pytest.raises(SystemExit) as exc:
-        main(["new", "--variant", "oware", "--seeds", "5"])
+        main(["new", "--variant", "oware", "--seeds", "4"])
     assert exc.value.code == 2
-    assert "oware is played with exactly 4 seeds per cup" in capsys.readouterr().err
+    error = capsys.readouterr().err
+    assert "seeds_per_cup" in error
+    assert "Extra inputs are not permitted" in error
 
 
 def test_kalah_rejects_out_of_range_seed_counts(
@@ -242,7 +251,9 @@ def test_kalah_rejects_out_of_range_seed_counts(
     with pytest.raises(SystemExit) as exc:
         main(["new", "--variant", "kalah", "--seeds", "2"])
     assert exc.value.code == 2
-    assert "kalah supports 3-6 seeds per cup" in capsys.readouterr().err
+    error = capsys.readouterr().err
+    assert "seeds_per_cup" in error
+    assert "greater than or equal to 3" in error
 
 
 def test_unknown_variant_is_rejected(capsys: pytest.CaptureFixture[str]) -> None:

@@ -32,8 +32,12 @@ def main(
     parser = argparse.ArgumentParser(prog="mancala", description="Hot-seat mancala.")
     subparsers = parser.add_subparsers(dest="command", required=True)
     new = subparsers.add_parser("new", help="start a new game")
-    new.add_argument("--variant", choices=variants.available(), default="kalah")
-    new.add_argument("--seeds", type=int, default=4, help="seeds per cup (kalah: 3-6)")
+    new.add_argument(
+        "--variant",
+        choices=[variant.id for variant in variants.available()],
+        default="kalah",
+    )
+    new.add_argument("--seeds", type=int, help="seeds per cup (kalah: 3-6, default 4)")
     new.add_argument(
         "player1", nargs="?", default="Player 1", help="name, or cpu:<difficulty>"
     )
@@ -48,13 +52,14 @@ def main(
     stdout = stdout if stdout is not None else sys.stdout
     if args.command == "resume":
         try:
-            match, specs = save.load(args.file)
+            variant, match, specs = save.load(args.file)
         except (OSError, save.SaveError) as error:
             resume.error(str(error))
     else:
-        rules = variants.get(args.variant)
+        variant = variants.get(args.variant)
+        options = {} if args.seeds is None else {"seeds_per_cup": args.seeds}
         try:
-            match = Match(rules, rules.initial_state(args.seeds))
+            match = Match(variant.create(options))
         except ValueError as error:
             new.error(str(error))
         specs = {Player.SOUTH: args.player1, Player.NORTH: args.player2}
@@ -65,4 +70,4 @@ def main(
         )
     except ValueError as error:
         parser.error(str(error))
-    return play_match(match, players, stdout)
+    return play_match(variant, match, players, stdout)

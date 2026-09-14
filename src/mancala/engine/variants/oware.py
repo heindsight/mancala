@@ -2,6 +2,8 @@
 
 from collections.abc import Container
 
+from pydantic import BaseModel, ConfigDict
+
 from mancala.engine.events import Captured, Event, GameOver, SeedSown
 from mancala.engine.rules import Move, MoveResult
 from mancala.engine.state import GameState, Player
@@ -12,6 +14,7 @@ from mancala.engine.variants._common import (
     sweep_remaining,
     winner_from_stores,
 )
+from mancala.engine.variants.descriptor import VariantDescriptor
 
 _CUPS = 6
 _SEEDS_PER_CUP = 4
@@ -23,16 +26,22 @@ _TOTAL_SEEDS = 2 * _CUPS * _SEEDS_PER_CUP
 _TARGET = _TOTAL_SEEDS // 2  # capturing more than half of the seeds wins
 
 
-class Oware:
-    name = "oware"
-    SEED_COUNTS = (_SEEDS_PER_CUP,)
+class OwareConfig(BaseModel):
+    """Settings for one game of Oware. It has nothing to configure."""
 
-    def initial_state(self, seeds_per_cup: int = _SEEDS_PER_CUP) -> GameState:
-        if seeds_per_cup not in self.SEED_COUNTS:
-            raise ValueError(
-                f"oware is played with exactly {_SEEDS_PER_CUP} seeds per cup"
-            )
-        row = (seeds_per_cup,) * _CUPS
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class Oware:
+    def __init__(self, config: OwareConfig) -> None:
+        self._config = config
+
+    @property
+    def config(self) -> OwareConfig:
+        return self._config
+
+    def initial_state(self) -> GameState:
+        row = (_SEEDS_PER_CUP,) * _CUPS
         return GameState(board=(row, row), stores=(0, 0), current_player=Player.SOUTH)
 
     def legal_moves(self, state: GameState) -> tuple[Move, ...]:
@@ -102,3 +111,8 @@ class Oware:
 
     def winner(self, state: GameState) -> Player | None:
         return winner_from_stores(state) if self.is_over(state) else None
+
+
+DESCRIPTOR = VariantDescriptor(
+    id="oware", display_name="Oware", config_model=OwareConfig, factory=Oware
+)

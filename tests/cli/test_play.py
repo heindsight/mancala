@@ -14,13 +14,15 @@ from mancala.cli.play import (
     play_match,
     read_move,
 )
+from mancala.engine import variants
 from mancala.engine.match import Match
 from mancala.engine.rules import Move
 from mancala.engine.state import Player
-from mancala.engine.variants.kalah import Kalah
+from mancala.engine.variants.kalah import Kalah, KalahConfig
 from mancala.session import save
 
-KALAH = Kalah()
+KALAH = Kalah(KalahConfig())
+KALAH_VARIANT = variants.get("kalah")
 NAMES = {Player.SOUTH: "Heinrich", Player.NORTH: "Nora"}
 ENDGAME = make_state(south=(0, 0, 0, 0, 0, 1), north=(0,) * 6, stores=(23, 24))
 PROMPT = "Ana, choose a cup (1-6) or 'save FILE': "
@@ -178,26 +180,38 @@ def test_play_match_returns_0_for_a_game_played_to_completion(
 ) -> None:
     mock_read_move.side_effect = [5]
     stdout = io.StringIO()
-    assert play_match(Match(KALAH, ENDGAME), humans(io.StringIO(), stdout), stdout) == 0
+    assert (
+        play_match(
+            KALAH_VARIANT, Match(KALAH, ENDGAME), humans(io.StringIO(), stdout), stdout
+        )
+        == 0
+    )
 
 
 def test_play_match_returns_1_when_input_runs_out(mock_read_move: MagicMock) -> None:
     mock_read_move.side_effect = [None]
     stdout = io.StringIO()
-    assert play_match(Match(KALAH, ENDGAME), humans(io.StringIO(), stdout), stdout) == 1
+    assert (
+        play_match(
+            KALAH_VARIANT, Match(KALAH, ENDGAME), humans(io.StringIO(), stdout), stdout
+        )
+        == 1
+    )
 
 
 def test_play_match_reports_an_abandoned_game(mock_read_move: MagicMock) -> None:
     mock_read_move.side_effect = [None]
     stdout = io.StringIO()
-    play_match(Match(KALAH, ENDGAME), humans(io.StringIO(), stdout), stdout)
+    play_match(
+        KALAH_VARIANT, Match(KALAH, ENDGAME), humans(io.StringIO(), stdout), stdout
+    )
     assert stdout.getvalue().endswith("\nGame abandoned.\n")
 
 
 def test_play_match_prompts_the_current_player(mock_read_move: MagicMock) -> None:
     mock_read_move.side_effect = [5]
     stdin, stdout = io.StringIO(), io.StringIO()
-    play_match(Match(KALAH, ENDGAME), humans(stdin, stdout), stdout)
+    play_match(KALAH_VARIANT, Match(KALAH, ENDGAME), humans(stdin, stdout), stdout)
     assert mock_read_move.call_args_list == [call("Heinrich", 6, stdin, stdout)]
 
 
@@ -207,7 +221,7 @@ def test_play_match_prompts_the_players_in_turn_order(
     mock_read_move.side_effect = [0, 0, None]
     start = make_state(south=(1, 1, 0, 0, 0, 0), north=(1, 0, 0, 0, 0, 0))
     stdin, stdout = io.StringIO(), io.StringIO()
-    play_match(Match(KALAH, start), humans(stdin, stdout), stdout)
+    play_match(KALAH_VARIANT, Match(KALAH, start), humans(stdin, stdout), stdout)
     assert mock_read_move.call_args_list == [
         call("Heinrich", 6, stdin, stdout),
         call("Nora", 6, stdin, stdout),
@@ -221,21 +235,25 @@ def test_play_match_prompts_the_same_player_after_an_extra_turn(
     mock_read_move.side_effect = [5, None]
     start = make_state(south=(1, 0, 0, 0, 0, 1), north=(1, 0, 0, 0, 0, 0))
     stdin, stdout = io.StringIO(), io.StringIO()
-    play_match(Match(KALAH, start), humans(stdin, stdout), stdout)
+    play_match(KALAH_VARIANT, Match(KALAH, start), humans(stdin, stdout), stdout)
     assert mock_read_move.call_args_list == [call("Heinrich", 6, stdin, stdout)] * 2
 
 
 def test_play_match_narrates_the_move(mock_read_move: MagicMock) -> None:
     mock_read_move.side_effect = [5]
     stdout = io.StringIO()
-    play_match(Match(KALAH, ENDGAME), humans(io.StringIO(), stdout), stdout)
+    play_match(
+        KALAH_VARIANT, Match(KALAH, ENDGAME), humans(io.StringIO(), stdout), stdout
+    )
     assert "Heinrich sows 1 seed from cup 6.\nThe game is over.\n" in stdout.getvalue()
 
 
 def test_play_match_announces_the_result(mock_read_move: MagicMock) -> None:
     mock_read_move.side_effect = [5]
     stdout = io.StringIO()
-    play_match(Match(KALAH, ENDGAME), humans(io.StringIO(), stdout), stdout)
+    play_match(
+        KALAH_VARIANT, Match(KALAH, ENDGAME), humans(io.StringIO(), stdout), stdout
+    )
     assert stdout.getvalue().endswith("It's a draw, 24-24.\n")
 
 
@@ -245,7 +263,7 @@ def test_play_match_renders_the_board_before_the_move_and_after_the_game(
     mock_read_move.side_effect = [5]
     match = Match(KALAH, ENDGAME)
     stdout = io.StringIO()
-    play_match(match, humans(io.StringIO(), stdout), stdout)
+    play_match(KALAH_VARIANT, match, humans(io.StringIO(), stdout), stdout)
     assert mock_render_board.call_args_list == [
         call(ENDGAME, NAMES),
         call(match.state, NAMES),
@@ -258,7 +276,9 @@ def test_play_match_renders_the_current_position_each_round(
     mock_read_move.side_effect = [0, 0, None]
     start = make_state(south=(1, 1, 0, 0, 0, 0), north=(1, 0, 0, 0, 0, 0))
     stdout = io.StringIO()
-    play_match(Match(KALAH, start), humans(io.StringIO(), stdout), stdout)
+    play_match(
+        KALAH_VARIANT, Match(KALAH, start), humans(io.StringIO(), stdout), stdout
+    )
     assert mock_render_board.call_args_list == [
         call(start, NAMES),
         call(
@@ -280,9 +300,10 @@ def test_play_match_saves_the_game_and_exits(
     mock_read_move.side_effect = [0, SaveGame(str(file))]
     match = Match(KALAH)
     stdout = io.StringIO()
-    assert play_match(match, humans(io.StringIO(), stdout), stdout) == 0
+    assert play_match(KALAH_VARIANT, match, humans(io.StringIO(), stdout), stdout) == 0
     assert stdout.getvalue().endswith(f"Game saved to {file}.\n")
-    restored, specs = save.load(file)
+    variant, restored, specs = save.load(file)
+    assert variant.id == "kalah"
     assert restored.state == match.state
     assert restored.history == match.history
     assert specs == NAMES
@@ -293,8 +314,8 @@ def test_play_match_records_a_computer_players_spec(tmp_path: Path) -> None:
     stdout = io.StringIO()
     human = HumanPlayer("Nora", io.StringIO(f"save {file}\n"), stdout)
     computer = ComputerPlayer("Computer (hard)", ScriptedStrategy(), stdout, "cpu:hard")
-    assert play_match(Match(KALAH), (human, computer), stdout) == 0
-    _, specs = save.load(file)
+    assert play_match(KALAH_VARIANT, Match(KALAH), (human, computer), stdout) == 0
+    _, _, specs = save.load(file)
     assert specs == {Player.SOUTH: "Nora", Player.NORTH: "cpu:hard"}
 
 
@@ -304,21 +325,26 @@ def test_play_match_keeps_playing_when_saving_fails(
     file = tmp_path / "missing-directory" / "game.json"
     mock_read_move.side_effect = [SaveGame(str(file)), None]
     stdout = io.StringIO()
-    assert play_match(Match(KALAH), humans(io.StringIO(), stdout), stdout) == 1
+    assert (
+        play_match(KALAH_VARIANT, Match(KALAH), humans(io.StringIO(), stdout), stdout)
+        == 1
+    )
     assert "Could not save: " in stdout.getvalue()
 
 
 def test_play_match_reports_an_illegal_move(mock_read_move: MagicMock) -> None:
     mock_read_move.side_effect = [0, 5]
     stdout = io.StringIO()
-    play_match(Match(KALAH, ENDGAME), humans(io.StringIO(), stdout), stdout)
+    play_match(
+        KALAH_VARIANT, Match(KALAH, ENDGAME), humans(io.StringIO(), stdout), stdout
+    )
     assert "Cup 1 is not a legal move.\n" in stdout.getvalue()
 
 
 def test_play_match_asks_again_after_an_illegal_move(mock_read_move: MagicMock) -> None:
     mock_read_move.side_effect = [0, 5]
     stdin, stdout = io.StringIO(), io.StringIO()
-    play_match(Match(KALAH, ENDGAME), humans(stdin, stdout), stdout)
+    play_match(KALAH_VARIANT, Match(KALAH, ENDGAME), humans(stdin, stdout), stdout)
     assert mock_read_move.call_args_list == [call("Heinrich", 6, stdin, stdout)] * 2
 
 
@@ -328,7 +354,9 @@ def test_play_match_lets_a_computer_move_without_prompting(
     stdout = io.StringIO()
     computer = ComputerPlayer("Heinrich", ScriptedStrategy(5), stdout)
     _, north = humans(io.StringIO(), stdout)
-    assert play_match(Match(KALAH, ENDGAME), (computer, north), stdout) == 0
+    assert (
+        play_match(KALAH_VARIANT, Match(KALAH, ENDGAME), (computer, north), stdout) == 0
+    )
     mock_read_move.assert_not_called()
 
 
@@ -338,5 +366,5 @@ def test_play_match_still_prompts_the_human_side(mock_read_move: MagicMock) -> N
     stdin, stdout = io.StringIO(), io.StringIO()
     south, _ = humans(stdin, stdout)
     computer = ComputerPlayer("Nora", ScriptedStrategy(0), stdout)
-    play_match(Match(KALAH, start), (south, computer), stdout)
+    play_match(KALAH_VARIANT, Match(KALAH, start), (south, computer), stdout)
     assert mock_read_move.call_args_list == [call("Heinrich", 6, stdin, stdout)] * 2
