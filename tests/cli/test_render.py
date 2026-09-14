@@ -22,6 +22,18 @@ def test_render_board_puts_the_current_player_on_the_bottom() -> None:
     )
 
 
+def test_render_board_numbers_every_cup_on_the_board() -> None:
+    state = make_state(south=(1, 2, 3, 4), north=(5, 6, 7, 8), stores=(0, 1))
+    assert render_board(state, NAMES) == (
+        "Nora (store: 1)\n"
+        "    (4)   (3)   (2)   (1)\n"
+        "    [ 8]  [ 7]  [ 6]  [ 5]\n"
+        "    [ 1]  [ 2]  [ 3]  [ 4]\n"
+        "    (1)   (2)   (3)   (4)\n"
+        "Heinrich (store: 0)"
+    )
+
+
 def test_render_board_flips_for_the_other_player() -> None:
     state = make_state(
         south=(1, 2, 3, 4, 5, 6),

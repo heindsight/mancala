@@ -6,7 +6,6 @@ from mancala.engine.events import Captured, Event, GameOver, SeedSown
 from mancala.engine.rules import Move, MoveResult
 from mancala.engine.state import GameState, Player
 from mancala.engine.variants._common import (
-    CUPS,
     board_empty,
     frozen,
     mutable,
@@ -14,20 +13,24 @@ from mancala.engine.variants._common import (
     winner_from_stores,
 )
 
-# Sowing cycle: positions 0-5 are the mover's cups, 6-11 the opponent's.
-_CYCLE = 2 * CUPS
+_CUPS = 6
+_SEEDS_PER_CUP = 4
 
-_TARGET = 24  # capturing more than half of the 48 seeds wins
+# Sowing cycle: positions 0-5 are the mover's cups, 6-11 the opponent's.
+_CYCLE = 2 * _CUPS
+
+_SEEDS = 2 * _CUPS * _SEEDS_PER_CUP
+_TARGET = _SEEDS // 2  # capturing more than half of the seeds wins
 
 
 class Oware:
     name = "oware"
-    SEED_COUNTS = (4,)
+    SEED_COUNTS = (_SEEDS_PER_CUP,)
 
     def initial_state(self, seeds_per_cup: int = 4) -> GameState:
         if seeds_per_cup not in self.SEED_COUNTS:
             raise ValueError("oware is played with exactly 4 seeds per cup")
-        row = (seeds_per_cup,) * CUPS
+        row = (seeds_per_cup,) * _CUPS
         return GameState(board=(row, row), stores=(0, 0), current_player=Player.SOUTH)
 
     def legal_moves(self, state: GameState) -> tuple[Move, ...]:
@@ -37,7 +40,7 @@ class Oware:
         if any(state.board[mover.opponent.value]):
             return moves
         # Opponent is out of seeds: only a move that reaches their row feeds them.
-        return tuple(cup for cup in moves if cup + own[cup] >= CUPS)
+        return tuple(cup for cup in moves if cup + own[cup] >= _CUPS)
 
     def apply_move(
         self,
@@ -57,16 +60,16 @@ class Oware:
             pos = (pos + 1) % _CYCLE
             if pos == move:  # the origin cup is never resown
                 continue
-            owner, cup = (mover, pos) if pos < CUPS else (opponent, pos - CUPS)
+            owner, cup = (mover, pos) if pos < _CUPS else (opponent, pos - _CUPS)
             board[owner.value][cup] += 1
             events.append(SeedSown(owner, cup))
             seeds -= 1
 
-        if pos >= CUPS:  # landed in the opponent's row: try to capture
+        if pos >= _CUPS:  # landed in the opponent's row: try to capture
             chain: list[int] = []
             p = pos
-            while p >= CUPS and board[opponent.value][p - CUPS] in (2, 3):
-                chain.append(p - CUPS)
+            while p >= _CUPS and board[opponent.value][p - _CUPS] in (2, 3):
+                chain.append(p - _CUPS)
                 p -= 1
             taking = sum(board[opponent.value][cup] for cup in chain)
             if chain and taking < sum(board[opponent.value]):  # grand slam forfeits

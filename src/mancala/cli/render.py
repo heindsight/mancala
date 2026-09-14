@@ -43,13 +43,14 @@ def render_board(state: GameState, names: dict[Player, str]) -> str:
     """Current player's cups on the bottom row, sowing left to right."""
     bottom = state.current_player
     top = bottom.opponent
+    labels = [f"({i}) " for i in range(1, len(state.board[bottom.value]) + 1)]
     return "\n".join(
         [
             f"{names[top]} (store: {state.stores[top.value]})",
-            _cells([f"({i}) " for i in range(6, 0, -1)]),
+            _cells(labels[::-1]),
             _cells([f"[{n:>2}]" for n in reversed(state.board[top.value])]),
             _cells([f"[{n:>2}]" for n in state.board[bottom.value]]),
-            _cells([f"({i}) " for i in range(1, 7)]),
+            _cells(labels),
             f"{names[bottom]} (store: {state.stores[bottom.value]})",
         ]
     )

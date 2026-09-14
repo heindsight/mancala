@@ -53,32 +53,32 @@ def mock_render_board(mocker: MockerFixture) -> MagicMock:
 
 
 def test_read_move_returns_the_chosen_cup_as_a_zero_based_move() -> None:
-    assert read_move("Ana", io.StringIO("3\n"), io.StringIO()) == 2
+    assert read_move("Ana", 6, io.StringIO("3\n"), io.StringIO()) == 2
 
 
 def test_read_move_prompts_the_player_by_name() -> None:
     stdout = io.StringIO()
-    read_move("Ana", io.StringIO("3\n"), stdout)
+    read_move("Ana", 6, io.StringIO("3\n"), stdout)
     assert stdout.getvalue() == PROMPT
 
 
 def test_read_move_returns_none_when_input_is_exhausted() -> None:
-    assert read_move("Ana", io.StringIO(""), io.StringIO()) is None
+    assert read_move("Ana", 6, io.StringIO(""), io.StringIO()) is None
 
 
 def test_read_move_returns_none_when_interrupted(mocker: MockerFixture) -> None:
     stdin = mocker.MagicMock(spec=io.StringIO)
     stdin.readline.side_effect = KeyboardInterrupt
-    assert read_move("Ana", stdin, io.StringIO()) is None
+    assert read_move("Ana", 6, stdin, io.StringIO()) is None
 
 
 def test_read_move_keeps_prompting_until_the_input_is_valid() -> None:
-    assert read_move("Ana", io.StringIO("x\n0\n7\n3\n"), io.StringIO()) == 2
+    assert read_move("Ana", 6, io.StringIO("x\n0\n7\n3\n"), io.StringIO()) == 2
 
 
 def test_read_move_explains_a_non_numeric_rejection() -> None:
     stdout = io.StringIO()
-    read_move("Ana", io.StringIO("x\n3\n"), stdout)
+    read_move("Ana", 6, io.StringIO("x\n3\n"), stdout)
     assert stdout.getvalue() == (
         f"{PROMPT}'x' is not a number between 1 and 6.\n{PROMPT}"
     )
@@ -87,20 +87,38 @@ def test_read_move_explains_a_non_numeric_rejection() -> None:
 @pytest.mark.parametrize("cup", [0, 7])
 def test_read_move_explains_an_out_of_range_rejection(cup: int) -> None:
     stdout = io.StringIO()
-    read_move("Ana", io.StringIO(f"{cup}\n3\n"), stdout)
+    read_move("Ana", 6, io.StringIO(f"{cup}\n3\n"), stdout)
     assert stdout.getvalue() == (
         f"{PROMPT}{cup} is not a number between 1 and 6.\n{PROMPT}"
     )
 
 
+def test_read_move_offers_every_cup_on_the_board() -> None:
+    stdout = io.StringIO()
+    read_move("Ana", 4, io.StringIO("3\n"), stdout)
+    assert stdout.getvalue() == "Ana, choose a cup (1-4) or 'save FILE': "
+
+
+def test_read_move_rejects_a_cup_beyond_the_board() -> None:
+    stdout = io.StringIO()
+    assert read_move("Ana", 4, io.StringIO("5\n3\n"), stdout) == 2
+    assert "5 is not a number between 1 and 4.\n" in stdout.getvalue()
+
+
+def test_read_move_explains_a_non_numeric_rejection_against_the_board() -> None:
+    stdout = io.StringIO()
+    read_move("Ana", 4, io.StringIO("x\n3\n"), stdout)
+    assert "'x' is not a number between 1 and 4.\n" in stdout.getvalue()
+
+
 def test_read_move_returns_a_save_request() -> None:
     stdin = io.StringIO("save saved-game.json\n")
-    assert read_move("Ana", stdin, io.StringIO()) == SaveGame("saved-game.json")
+    assert read_move("Ana", 6, stdin, io.StringIO()) == SaveGame("saved-game.json")
 
 
 def test_read_move_asks_again_when_save_names_no_file() -> None:
     stdout = io.StringIO()
-    assert read_move("Ana", io.StringIO("save\n3\n"), stdout) == 2
+    assert read_move("Ana", 6, io.StringIO("save\n3\n"), stdout) == 2
     assert "Say where to save the game: 'save FILE'.\n" in stdout.getvalue()
 
 
@@ -110,7 +128,16 @@ def test_human_player_prompts_by_name_and_returns_the_move(
     mock_read_move.return_value = 5
     stdin, stdout = io.StringIO(), io.StringIO()
     assert HumanPlayer("Ana", stdin, stdout).get_move(Match(KALAH, ENDGAME)) == 5
-    assert mock_read_move.call_args_list == [call("Ana", stdin, stdout)]
+    assert mock_read_move.call_args_list == [call("Ana", 6, stdin, stdout)]
+
+
+def test_human_player_offers_the_cups_of_the_position(
+    mock_read_move: MagicMock,
+) -> None:
+    stdin, stdout = io.StringIO(), io.StringIO()
+    match = Match(KALAH, make_state(south=(0, 0, 0, 1), north=(1, 0, 0, 0)))
+    HumanPlayer("Ana", stdin, stdout).get_move(match)
+    assert mock_read_move.call_args_list == [call("Ana", 4, stdin, stdout)]
 
 
 def test_human_player_spec_is_its_name() -> None:
@@ -164,7 +191,7 @@ def test_play_match_prompts_the_current_player(mock_read_move: MagicMock) -> Non
     mock_read_move.side_effect = [5]
     stdin, stdout = io.StringIO(), io.StringIO()
     play_match(Match(KALAH, ENDGAME), humans(stdin, stdout), stdout)
-    assert mock_read_move.call_args_list == [call("Heinrich", stdin, stdout)]
+    assert mock_read_move.call_args_list == [call("Heinrich", 6, stdin, stdout)]
 
 
 def test_play_match_prompts_the_players_in_turn_order(
@@ -175,9 +202,9 @@ def test_play_match_prompts_the_players_in_turn_order(
     stdin, stdout = io.StringIO(), io.StringIO()
     play_match(Match(KALAH, start), humans(stdin, stdout), stdout)
     assert mock_read_move.call_args_list == [
-        call("Heinrich", stdin, stdout),
-        call("Nora", stdin, stdout),
-        call("Heinrich", stdin, stdout),
+        call("Heinrich", 6, stdin, stdout),
+        call("Nora", 6, stdin, stdout),
+        call("Heinrich", 6, stdin, stdout),
     ]
 
 
@@ -188,7 +215,7 @@ def test_play_match_prompts_the_same_player_after_an_extra_turn(
     start = make_state(south=(1, 0, 0, 0, 0, 1), north=(1, 0, 0, 0, 0, 0))
     stdin, stdout = io.StringIO(), io.StringIO()
     play_match(Match(KALAH, start), humans(stdin, stdout), stdout)
-    assert mock_read_move.call_args_list == [call("Heinrich", stdin, stdout)] * 2
+    assert mock_read_move.call_args_list == [call("Heinrich", 6, stdin, stdout)] * 2
 
 
 def test_play_match_narrates_the_move(mock_read_move: MagicMock) -> None:
@@ -285,7 +312,7 @@ def test_play_match_asks_again_after_an_illegal_move(mock_read_move: MagicMock) 
     mock_read_move.side_effect = [0, 5]
     stdin, stdout = io.StringIO(), io.StringIO()
     play_match(Match(KALAH, ENDGAME), humans(stdin, stdout), stdout)
-    assert mock_read_move.call_args_list == [call("Heinrich", stdin, stdout)] * 2
+    assert mock_read_move.call_args_list == [call("Heinrich", 6, stdin, stdout)] * 2
 
 
 def test_play_match_lets_a_computer_move_without_prompting(
@@ -305,4 +332,4 @@ def test_play_match_still_prompts_the_human_side(mock_read_move: MagicMock) -> N
     south, _ = humans(stdin, stdout)
     computer = ComputerPlayer("Nora", ScriptedStrategy(0), stdout)
     play_match(Match(KALAH, start), (south, computer), stdout)
-    assert mock_read_move.call_args_list == [call("Heinrich", stdin, stdout)] * 2
+    assert mock_read_move.call_args_list == [call("Heinrich", 6, stdin, stdout)] * 2

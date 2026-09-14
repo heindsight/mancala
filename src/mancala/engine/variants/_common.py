@@ -3,8 +3,6 @@
 from mancala.engine.events import Captured, Event
 from mancala.engine.state import GameState, Player
 
-CUPS = 6
-
 
 def mutable(state: GameState) -> tuple[list[list[int]], list[int]]:
     """Working copies of the board and stores for building the next state."""
