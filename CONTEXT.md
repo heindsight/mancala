@@ -17,9 +17,9 @@ that a side may be held by a computer, and how to persist and resume the game.
 
 ## Playing terms
 
-**Cup** — one of the six hollows on a side of the board that holds seeds.
-Numbered from 1 at the prompt, indexed from 0 in code, always counted in the
-direction the holder sows.
+**Cup** — one of the hollows on a side of the board that holds seeds. The
+variant fixes how many a side has. Numbered from 1 at the prompt, indexed from
+0 in code, always counted in the direction the holder sows.
 
 **Store** — the pit that accumulates a side's captured seeds. Not a cup: seeds
 in a store are never sown again.

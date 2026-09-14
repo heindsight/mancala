@@ -13,7 +13,6 @@ from mancala.engine.events import (
 from mancala.engine.rules import Move, MoveResult
 from mancala.engine.state import GameState, Player
 from mancala.engine.variants._common import (
-    CUPS,
     board_empty,
     frozen,
     mutable,
@@ -21,10 +20,12 @@ from mancala.engine.variants._common import (
     winner_from_stores,
 )
 
+_CUPS = 6
+
 # Sowing cycle: positions 0-5 are the mover's cups, 6 the mover's store,
 # 7-12 the opponent's cups. The opponent's store is not part of the cycle.
-_CYCLE = 13
-_STORE = CUPS
+_CYCLE = 2 * _CUPS + 1
+_STORE = _CUPS
 
 
 class Kalah:
@@ -34,7 +35,7 @@ class Kalah:
     def initial_state(self, seeds_per_cup: int = 4) -> GameState:
         if seeds_per_cup not in self.SEED_COUNTS:
             raise ValueError("kalah supports 3-6 seeds per cup")
-        row = (seeds_per_cup,) * CUPS
+        row = (seeds_per_cup,) * _CUPS
         return GameState(board=(row, row), stores=(0, 0), current_player=Player.SOUTH)
 
     def legal_moves(self, state: GameState) -> tuple[Move, ...]:
@@ -62,14 +63,16 @@ class Kalah:
                 stores[mover.value] += 1
                 events.append(SeedStored(mover))
             else:
-                owner, cup = (mover, pos) if pos < CUPS else (opponent, pos - CUPS - 1)
+                owner, cup = (
+                    (mover, pos) if pos < _CUPS else (opponent, pos - _CUPS - 1)
+                )
                 board[owner.value][cup] += 1
                 events.append(SeedSown(owner, cup))
             seeds -= 1
 
-        opposite = CUPS - 1 - pos
+        opposite = _CUPS - 1 - pos
         if (
-            pos < CUPS
+            pos < _CUPS
             and board[mover.value][pos] == 1
             and board[opponent.value][opposite]
         ):

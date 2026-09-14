@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from typing import Protocol, TextIO
 
 from mancala.cli.render import describe_move, describe_result, render_board
-from mancala.engine import variants
 from mancala.engine.match import Match
 from mancala.engine.rules import IllegalMoveError, Move
 from mancala.engine.state import Player
@@ -39,8 +38,8 @@ class HumanPlayer:
         self._stdout = stdout
 
     def get_move(self, match: Match) -> Move | SaveGame | None:
-        del match  # the human reads the position off the board on screen
-        return read_move(self.name, self._stdin, self._stdout)
+        cup_count = len(match.state.board[match.state.current_player.value])
+        return read_move(self.name, cup_count, self._stdin, self._stdout)
 
 
 class ComputerPlayer:
@@ -98,14 +97,16 @@ def play_match(
     return 0
 
 
-def read_move(name: str, stdin: TextIO, stdout: TextIO) -> Move | SaveGame | None:
-    """Prompt until `name` picks a cup between 1 and 6 or asks to save the game.
+def read_move(
+    name: str, cup_count: int, stdin: TextIO, stdout: TextIO
+) -> Move | SaveGame | None:
+    """Prompt until `name` picks one of their `cup_count` cups or asks to save.
 
     None means the player quit.
     """
     while True:
         print(
-            f"{name}, choose a cup (1-6) or 'save FILE': ",
+            f"{name}, choose a cup (1-{cup_count}) or 'save FILE': ",
             end="",
             file=stdout,
             flush=True,
@@ -126,8 +127,8 @@ def read_move(name: str, stdin: TextIO, stdout: TextIO) -> Move | SaveGame | Non
         try:
             cup = int(text)
         except ValueError:
-            print(f"{text!r} is not a number between 1 and 6.", file=stdout)
+            print(f"{text!r} is not a number between 1 and {cup_count}.", file=stdout)
             continue
-        if 1 <= cup <= variants.CUPS:
+        if 1 <= cup <= cup_count:
             return cup - 1
-        print(f"{cup} is not a number between 1 and 6.", file=stdout)
+        print(f"{cup} is not a number between 1 and {cup_count}.", file=stdout)
