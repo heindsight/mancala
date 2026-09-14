@@ -38,8 +38,8 @@ class HumanPlayer:
         self._stdout = stdout
 
     def get_move(self, match: Match) -> Move | SaveGame | None:
-        cups = len(match.state.board[match.state.current_player.value])
-        return read_move(self.name, cups, self._stdin, self._stdout)
+        cup_count = len(match.state.board[match.state.current_player.value])
+        return read_move(self.name, cup_count, self._stdin, self._stdout)
 
 
 class ComputerPlayer:
@@ -98,15 +98,15 @@ def play_match(
 
 
 def read_move(
-    name: str, cups: int, stdin: TextIO, stdout: TextIO
+    name: str, cup_count: int, stdin: TextIO, stdout: TextIO
 ) -> Move | SaveGame | None:
-    """Prompt until `name` picks a cup between 1 and `cups` or asks to save the game.
+    """Prompt until `name` picks one of their `cup_count` cups or asks to save.
 
     None means the player quit.
     """
     while True:
         print(
-            f"{name}, choose a cup (1-{cups}) or 'save FILE': ",
+            f"{name}, choose a cup (1-{cup_count}) or 'save FILE': ",
             end="",
             file=stdout,
             flush=True,
@@ -127,8 +127,8 @@ def read_move(
         try:
             cup = int(text)
         except ValueError:
-            print(f"{text!r} is not a number between 1 and {cups}.", file=stdout)
+            print(f"{text!r} is not a number between 1 and {cup_count}.", file=stdout)
             continue
-        if 1 <= cup <= cups:
+        if 1 <= cup <= cup_count:
             return cup - 1
-        print(f"{cup} is not a number between 1 and {cups}.", file=stdout)
+        print(f"{cup} is not a number between 1 and {cup_count}.", file=stdout)

@@ -19,17 +19,19 @@ _SEEDS_PER_CUP = 4
 # Sowing cycle: positions 0-5 are the mover's cups, 6-11 the opponent's.
 _CYCLE = 2 * _CUPS
 
-_SEEDS = 2 * _CUPS * _SEEDS_PER_CUP
-_TARGET = _SEEDS // 2  # capturing more than half of the seeds wins
+_TOTAL_SEEDS = 2 * _CUPS * _SEEDS_PER_CUP
+_TARGET = _TOTAL_SEEDS // 2  # capturing more than half of the seeds wins
 
 
 class Oware:
     name = "oware"
     SEED_COUNTS = (_SEEDS_PER_CUP,)
 
-    def initial_state(self, seeds_per_cup: int = 4) -> GameState:
+    def initial_state(self, seeds_per_cup: int = _SEEDS_PER_CUP) -> GameState:
         if seeds_per_cup not in self.SEED_COUNTS:
-            raise ValueError("oware is played with exactly 4 seeds per cup")
+            raise ValueError(
+                f"oware is played with exactly {_SEEDS_PER_CUP} seeds per cup"
+            )
         row = (seeds_per_cup,) * _CUPS
         return GameState(board=(row, row), stores=(0, 0), current_player=Player.SOUTH)
 

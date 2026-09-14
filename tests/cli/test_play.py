@@ -24,6 +24,7 @@ KALAH = Kalah()
 NAMES = {Player.SOUTH: "Heinrich", Player.NORTH: "Nora"}
 ENDGAME = make_state(south=(0, 0, 0, 0, 0, 1), north=(0,) * 6, stores=(23, 24))
 PROMPT = "Ana, choose a cup (1-6) or 'save FILE': "
+FOUR_CUP_PROMPT = "Ana, choose a cup (1-4) or 'save FILE': "
 
 
 class ScriptedStrategy:
@@ -56,10 +57,13 @@ def test_read_move_returns_the_chosen_cup_as_a_zero_based_move() -> None:
     assert read_move("Ana", 6, io.StringIO("3\n"), io.StringIO()) == 2
 
 
-def test_read_move_prompts_the_player_by_name() -> None:
+@pytest.mark.parametrize(("cup_count", "prompt"), [(6, PROMPT), (4, FOUR_CUP_PROMPT)])
+def test_read_move_prompts_the_player_by_name_for_one_of_their_cups(
+    cup_count: int, prompt: str
+) -> None:
     stdout = io.StringIO()
-    read_move("Ana", 6, io.StringIO("3\n"), stdout)
-    assert stdout.getvalue() == PROMPT
+    read_move("Ana", cup_count, io.StringIO("3\n"), stdout)
+    assert stdout.getvalue() == prompt
 
 
 def test_read_move_returns_none_when_input_is_exhausted() -> None:
@@ -76,39 +80,42 @@ def test_read_move_keeps_prompting_until_the_input_is_valid() -> None:
     assert read_move("Ana", 6, io.StringIO("x\n0\n7\n3\n"), io.StringIO()) == 2
 
 
-def test_read_move_explains_a_non_numeric_rejection() -> None:
+@pytest.mark.parametrize(
+    ("cup_count", "output"),
+    [
+        (6, f"{PROMPT}'x' is not a number between 1 and 6.\n{PROMPT}"),
+        (
+            4,
+            f"{FOUR_CUP_PROMPT}'x' is not a number between 1 and 4.\n{FOUR_CUP_PROMPT}",
+        ),
+    ],
+)
+def test_read_move_explains_a_non_numeric_rejection(
+    cup_count: int, output: str
+) -> None:
     stdout = io.StringIO()
-    read_move("Ana", 6, io.StringIO("x\n3\n"), stdout)
-    assert stdout.getvalue() == (
-        f"{PROMPT}'x' is not a number between 1 and 6.\n{PROMPT}"
-    )
+    read_move("Ana", cup_count, io.StringIO("x\n3\n"), stdout)
+    assert stdout.getvalue() == output
 
 
-@pytest.mark.parametrize("cup", [0, 7])
-def test_read_move_explains_an_out_of_range_rejection(cup: int) -> None:
+@pytest.mark.parametrize(
+    ("cup_count", "cup", "output"),
+    [
+        (6, 0, f"{PROMPT}0 is not a number between 1 and 6.\n{PROMPT}"),
+        (6, 7, f"{PROMPT}7 is not a number between 1 and 6.\n{PROMPT}"),
+        (
+            4,
+            5,
+            f"{FOUR_CUP_PROMPT}5 is not a number between 1 and 4.\n{FOUR_CUP_PROMPT}",
+        ),
+    ],
+)
+def test_read_move_explains_an_out_of_range_rejection(
+    cup_count: int, cup: int, output: str
+) -> None:
     stdout = io.StringIO()
-    read_move("Ana", 6, io.StringIO(f"{cup}\n3\n"), stdout)
-    assert stdout.getvalue() == (
-        f"{PROMPT}{cup} is not a number between 1 and 6.\n{PROMPT}"
-    )
-
-
-def test_read_move_offers_every_cup_on_the_board() -> None:
-    stdout = io.StringIO()
-    read_move("Ana", 4, io.StringIO("3\n"), stdout)
-    assert stdout.getvalue() == "Ana, choose a cup (1-4) or 'save FILE': "
-
-
-def test_read_move_rejects_a_cup_beyond_the_board() -> None:
-    stdout = io.StringIO()
-    assert read_move("Ana", 4, io.StringIO("5\n3\n"), stdout) == 2
-    assert "5 is not a number between 1 and 4.\n" in stdout.getvalue()
-
-
-def test_read_move_explains_a_non_numeric_rejection_against_the_board() -> None:
-    stdout = io.StringIO()
-    read_move("Ana", 4, io.StringIO("x\n3\n"), stdout)
-    assert "'x' is not a number between 1 and 4.\n" in stdout.getvalue()
+    read_move("Ana", cup_count, io.StringIO(f"{cup}\n3\n"), stdout)
+    assert stdout.getvalue() == output
 
 
 def test_read_move_returns_a_save_request() -> None:
@@ -132,11 +139,11 @@ def test_human_player_prompts_by_name_and_returns_the_move(
 
 
 def test_human_player_offers_the_cups_of_the_position(
-    mock_read_move: MagicMock,
+    mocker: MockerFixture, mock_read_move: MagicMock
 ) -> None:
     stdin, stdout = io.StringIO(), io.StringIO()
-    match = Match(KALAH, make_state(south=(0, 0, 0, 1), north=(1, 0, 0, 0)))
-    HumanPlayer("Ana", stdin, stdout).get_move(match)
+    position = make_state(south=(0, 0, 0, 1), north=(1, 0, 0, 0))
+    HumanPlayer("Ana", stdin, stdout).get_move(mocker.Mock(Match, state=position))
     assert mock_read_move.call_args_list == [call("Ana", 4, stdin, stdout)]
 
 
