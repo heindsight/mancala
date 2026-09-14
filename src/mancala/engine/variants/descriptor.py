@@ -11,11 +11,12 @@ from mancala.engine.rules import Rules
 class VariantDescriptor(NamedTuple):
     """What a front-end reads to offer a variant, and how it creates one.
 
-    `create` takes a plain mapping rather than a config object, so another
-    variant's settings cannot be handed to this one: the mapping is parsed by
-    this variant's own `config_model`, which refuses settings it does not
-    declare. `factory` accepts `Any` because a constructor taking only its own
-    config model cannot satisfy a callable declared to take any `BaseModel`.
+    `create` takes a plain mapping, not a config object. This variant's own
+    `config_model` parses the mapping and refuses options it does not declare.
+    So another variant's config cannot be given to this one.
+
+    `factory` accepts `Any`. A constructor that takes only its own config model
+    cannot satisfy a callable declared to take any `BaseModel`.
     """
 
     id: str

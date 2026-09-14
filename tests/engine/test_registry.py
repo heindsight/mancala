@@ -15,39 +15,40 @@ def test_get_returns_the_descriptor_for_the_named_variant() -> None:
     assert variants.get("oware").id == "oware"
 
 
-def test_a_variant_created_without_options_uses_its_defaults() -> None:
+def test_rules_created_without_options_use_the_default_config() -> None:
     rules = variants.get("kalah").create()
     assert rules.initial_state().board == ((4,) * 6, (4,) * 6)
 
 
-def test_a_variant_is_created_with_the_requested_options() -> None:
+def test_rules_are_created_with_the_requested_options() -> None:
     rules = variants.get("kalah").create({"seeds_per_cup": 6})
     assert rules.initial_state().board == ((6,) * 6, (6,) * 6)
 
 
-def test_a_created_variant_carries_its_settings() -> None:
+def test_created_rules_carry_their_config() -> None:
     rules = variants.get("kalah").create({"seeds_per_cup": 3})
     assert rules.config.model_dump() == {"seeds_per_cup": 3}
 
 
-def test_a_variant_with_nothing_to_configure_carries_empty_settings() -> None:
+def test_a_variant_with_nothing_to_configure_has_an_empty_config() -> None:
     assert variants.get("oware").create().config.model_dump() == {}
 
 
 @pytest.mark.parametrize("seeds", [2, 7])
-def test_an_out_of_range_setting_is_refused(seeds: int) -> None:
+def test_an_out_of_range_option_is_refused(seeds: int) -> None:
     with pytest.raises(ValidationError, match="seeds_per_cup"):
         variants.get("kalah").create({"seeds_per_cup": seeds})
 
 
-def test_a_setting_belonging_to_another_variant_is_refused() -> None:
+def test_an_option_belonging_to_another_variant_is_refused() -> None:
     with pytest.raises(ValidationError, match="seeds_per_cup"):
         variants.get("oware").create({"seeds_per_cup": 4})
 
 
-def test_an_unknown_setting_is_refused() -> None:
+@pytest.mark.parametrize("variant_id", [d.id for d in variants.available()])
+def test_every_variant_refuses_an_unknown_option(variant_id: str) -> None:
     with pytest.raises(ValidationError, match="cups_per_side"):
-        variants.get("kalah").create({"cups_per_side": 7})
+        variants.get(variant_id).create({"cups_per_side": 7})
 
 
 # The published schema is a contract with front-ends that read it directly, so

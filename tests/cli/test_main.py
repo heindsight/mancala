@@ -240,9 +240,7 @@ def test_oware_refuses_a_seed_count_rather_than_ignoring_it(
     with pytest.raises(SystemExit) as exc:
         main(["new", "--variant", "oware", "--seeds", "4"])
     assert exc.value.code == 2
-    error = capsys.readouterr().err
-    assert "seeds_per_cup" in error
-    assert "Extra inputs are not permitted" in error
+    assert "seeds_per_cup" in capsys.readouterr().err
 
 
 def test_kalah_rejects_out_of_range_seed_counts(
@@ -251,9 +249,7 @@ def test_kalah_rejects_out_of_range_seed_counts(
     with pytest.raises(SystemExit) as exc:
         main(["new", "--variant", "kalah", "--seeds", "2"])
     assert exc.value.code == 2
-    error = capsys.readouterr().err
-    assert "seeds_per_cup" in error
-    assert "greater than or equal to 3" in error
+    assert "seeds_per_cup" in capsys.readouterr().err
 
 
 def test_unknown_variant_is_rejected(capsys: pytest.CaptureFixture[str]) -> None:

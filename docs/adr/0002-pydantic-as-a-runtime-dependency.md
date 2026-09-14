@@ -7,9 +7,11 @@ pydantic parses a variant's options where they enter the system, and it
 generates the JSON Schema that front-ends read (ADR 0003). It is the project's
 first runtime dependency.
 
-pydantic is used at boundaries only. Positions and events stay plain
-`NamedTuple`s. A computer player hashes a position at every node of its
-search, so they must stay cheap to build and compare.
+pydantic parses input at boundaries only. Inside the engine, the only pydantic
+types are the config models. Each rules object holds one, already parsed.
+Positions and events stay plain `NamedTuple`s. A computer player hashes a
+position at every node of its search, so positions must stay cheap to build and
+compare.
 
 ## Considered options
 

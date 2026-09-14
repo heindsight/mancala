@@ -14,8 +14,8 @@ from mancala.engine.variants.descriptor import VariantDescriptor
 from mancala.session import save
 
 NAMES = {Player.SOUTH: "Heinrich", Player.NORTH: "Nora"}
-KALAH = variants.get("kalah")
-OWARE = variants.get("oware")
+KALAH_VARIANT = variants.get("kalah")
+OWARE_VARIANT = variants.get("oware")
 
 
 def played(variant: VariantDescriptor, moves: tuple[int, ...] = (2, 0, 1)) -> Match:
@@ -33,9 +33,9 @@ def first_legal_playout(variant: VariantDescriptor) -> Match:
 
 
 def test_a_saved_game_round_trips_through_a_file(tmp_path: Path) -> None:
-    original = played(KALAH)
+    original = played(KALAH_VARIANT)
     file = tmp_path / "game.json"
-    save.dump(KALAH, original, NAMES, file)
+    save.dump(KALAH_VARIANT, original, NAMES, file)
     variant, restored, names = save.load(file)
     assert variant.id == "kalah"
     assert restored.rules.config == original.rules.config
@@ -45,9 +45,9 @@ def test_a_saved_game_round_trips_through_a_file(tmp_path: Path) -> None:
 
 
 def test_a_fresh_game_round_trips() -> None:
-    original = Match(OWARE.create())
+    original = Match(OWARE_VARIANT.create())
     variant, restored, names = save.from_document(
-        save.to_document(OWARE, original, NAMES)
+        save.to_document(OWARE_VARIANT, original, NAMES)
     )
     assert variant.id == "oware"
     assert restored.state == original.state
@@ -56,31 +56,37 @@ def test_a_fresh_game_round_trips() -> None:
 
 
 def test_a_game_with_non_default_settings_round_trips() -> None:
-    original = Match(KALAH.create({"seeds_per_cup": 6}))
+    original = Match(KALAH_VARIANT.create({"seeds_per_cup": 6}))
     original.play(0)
-    _, restored, _ = save.from_document(save.to_document(KALAH, original, NAMES))
+    _, restored, _ = save.from_document(
+        save.to_document(KALAH_VARIANT, original, NAMES)
+    )
     assert restored.rules.config == original.rules.config
     assert restored.state == original.state
 
 
 def test_a_finished_game_round_trips() -> None:
-    original = first_legal_playout(KALAH)
-    _, restored, _ = save.from_document(save.to_document(KALAH, original, NAMES))
+    original = first_legal_playout(KALAH_VARIANT)
+    _, restored, _ = save.from_document(
+        save.to_document(KALAH_VARIANT, original, NAMES)
+    )
     assert restored.is_over
     assert restored.winner is original.winner
     assert restored.history == original.history
 
 
 def test_resuming_restores_the_states_oware_repetition_detection_needs() -> None:
-    original = played(OWARE, moves=(0, 1, 2, 3))
-    _, restored, _ = save.from_document(save.to_document(OWARE, original, NAMES))
+    original = played(OWARE_VARIANT, moves=(0, 1, 2, 3))
+    _, restored, _ = save.from_document(
+        save.to_document(OWARE_VARIANT, original, NAMES)
+    )
     assert restored.history == original.history
     assert restored._seen == original._seen
 
 
 def test_the_document_records_the_metadata() -> None:
-    match = played(OWARE, moves=(5, 4))
-    document: dict[str, Any] = save.to_document(OWARE, match, NAMES)
+    match = played(OWARE_VARIANT, moves=(5, 4))
+    document: dict[str, Any] = save.to_document(OWARE_VARIANT, match, NAMES)
     assert document["format"] == save.FORMAT
     assert document["version"] == save.VERSION
     metadata = document["metadata"]
@@ -92,7 +98,9 @@ def test_the_document_records_the_metadata() -> None:
 
 
 def test_the_document_records_default_settings_explicitly() -> None:
-    document: dict[str, Any] = save.to_document(KALAH, Match(KALAH.create()), NAMES)
+    document: dict[str, Any] = save.to_document(
+        KALAH_VARIANT, Match(KALAH_VARIANT.create()), NAMES
+    )
     assert document["metadata"]["config"] == {"seeds_per_cup": 4}
 
 
@@ -100,7 +108,7 @@ def test_dump_writes_pretty_printed_json_with_a_trailing_newline(
     tmp_path: Path,
 ) -> None:
     file = tmp_path / "game.json"
-    save.dump(KALAH, played(KALAH), NAMES, file)
+    save.dump(KALAH_VARIANT, played(KALAH_VARIANT), NAMES, file)
     text = file.read_text(encoding="utf-8")
     assert text.endswith("}\n")
     assert json.loads(text)["format"] == save.FORMAT
@@ -108,16 +116,16 @@ def test_dump_writes_pretty_printed_json_with_a_trailing_newline(
 
 def test_a_match_started_mid_game_cannot_be_saved() -> None:
     start = make_state(south=(1, 0, 2, 0, 0, 3), north=(4, 0, 0, 1, 0, 0))
-    match = Match(KALAH.create(), start)
+    match = Match(KALAH_VARIANT.create(), start)
     with pytest.raises(save.SaveError, match="initial position"):
-        save.to_document(KALAH, match, NAMES)
+        save.to_document(KALAH_VARIANT, match, NAMES)
 
 
 def test_a_match_that_did_not_start_from_its_configured_seeds_cannot_be_saved() -> None:
     start = make_state(south=(6,) * 6, north=(6,) * 6)
-    match = Match(KALAH.create({"seeds_per_cup": 4}), start)
+    match = Match(KALAH_VARIANT.create({"seeds_per_cup": 4}), start)
     with pytest.raises(save.SaveError, match="initial position"):
-        save.to_document(KALAH, match, NAMES)
+        save.to_document(KALAH_VARIANT, match, NAMES)
 
 
 def test_load_propagates_a_missing_file(tmp_path: Path) -> None:
@@ -217,15 +225,15 @@ def test_a_document_that_is_not_an_object_is_rejected() -> None:
 def test_corrupted_documents_are_rejected(
     corrupt: Callable[[dict], object], message: str
 ) -> None:
-    document = save.to_document(KALAH, played(KALAH), NAMES)
+    document = save.to_document(KALAH_VARIANT, played(KALAH_VARIANT), NAMES)
     corrupt(document)
     with pytest.raises(save.SaveError, match=message):
         save.from_document(document)
 
 
 def test_moves_beyond_the_end_of_the_game_are_rejected() -> None:
-    finished = first_legal_playout(KALAH)
-    document: dict[str, Any] = save.to_document(KALAH, finished, NAMES)
+    finished = first_legal_playout(KALAH_VARIANT)
+    document: dict[str, Any] = save.to_document(KALAH_VARIANT, finished, NAMES)
     document["history"].append(0)
     with pytest.raises(save.SaveError, match="cannot be replayed: the game is over"):
         save.from_document(document)
